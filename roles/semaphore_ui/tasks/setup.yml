@@ -1,0 +1,159 @@
+---
+# tasks/setup.yml - Setup semaphore container and configure
+- name: Create semaphore data volume
+  containers.podman.podman_volume:
+    name: "{{ semaphore_volume_name }}"
+    state: present
+
+- name: Create semaphore container
+  containers.podman.podman_container:
+    name: "{{ semaphore_container_name }}"
+    image: "{{ semaphore_image }}"
+    state: started
+    restart_policy: always
+    ports:
+      - "{{ semaphore_host_port }}:{{ semaphore_port }}"
+    volumes:
+      - "{{ semaphore_volume_name }}:/var/lib/semaphore:Z"
+      - "{{ git_volume | default(playbook_dir) }}:/git"
+    env:
+      SEMAPHORE_DB_DIALECT: bolt
+      SEMAPHORE_ADMIN: "{{ semaphore_admin_user }}"
+      SEMAPHORE_ADMIN_PASSWORD: "{{ semaphore_admin_password }}"
+      SEMAPHORE_ADMIN_EMAIL: "{{ semaphore_admin_email }}"
+      SEMAPHORE_ADMIN_NAME: "{{ semaphore_admin_name }}"
+      SEMAPHORE_ACCESS_KEY_ENCRYPTION: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+  register: container_result
+
+- name: Wait for Semaphore API to become available
+  ansible.builtin.uri:
+    url: "{{ semaphore_api_url }}/ping"
+    method: GET
+    status_code: [200, 204]
+  register: api_health
+  until: api_health.status in [200, 204]
+  retries: "{{ (semaphore_wait_timeout / semaphore_wait_delay) | int }}"
+  delay: "{{ semaphore_wait_delay }}"
+
+- name: Authenticate and get session cookie
+  ansible.builtin.uri:
+    url: "{{ semaphore_api_url }}/auth/login"
+    method: POST
+    body_format: json
+    body:
+      auth: "{{ semaphore_admin_user }}"
+      password: "{{ semaphore_admin_password }}"
+    status_code: [200, 204]
+    headers:
+      Content-Type: application/json
+  register: auth_response
+
+- name: Extract session cookie
+  ansible.builtin.set_fact:
+    semaphore_session_cookie: "{{ auth_response.cookies_string }}"
+
+- name: Create API token
+  ansible.builtin.uri:
+    url: "{{ semaphore_api_url }}/user/tokens"
+    method: POST
+    body_format: json
+    body: {}
+    status_code: [200, 201]
+    headers:
+      Content-Type: application/json
+      Cookie: "{{ semaphore_session_cookie }}"
+  register: token_response
+
+- name: Set API token fact
+  ansible.builtin.set_fact:
+    semaphore_api_token: "{{ token_response.json.id }}"
+
+- name: Create project "{{ semaphore_project_name }}"
+  ansible.builtin.uri:
+    url: "{{ semaphore_api_url }}/projects"
+    method: POST
+    body_format: json
+    body:
+      name: "{{ semaphore_project_name }}"
+      alert: false
+      alert_chat: ""
+      max_parallel_tasks: 0
+    status_code: [200, 201]
+    headers:
+      Content-Type: application/json
+      Authorization: "Bearer {{ semaphore_api_token }}"
+  register: project_response
+
+- name: Create localhost inventory at "{{ semaphore_api_url }}/project/{{ project_response.json.id }}/inventory"
+  ansible.builtin.uri:
+    url: "{{ semaphore_api_url }}/project/{{ project_response.json.id }}/inventory"
+    method: POST
+    body_format: json
+    body:
+      name: "localhost"
+      project_id: 1
+      inventory: |
+        [all]
+        localhost ansible_connection=local
+      type: "static"
+      ssh_key_id: null
+      become_key_id: null
+    headers:
+      Content-Type: application/json
+      Authorization: "Bearer {{ semaphore_api_token }}"
+    status_code: [200, 201]
+  register: inventory_result
+
+- name: Create local filesystem repository "{{ semaphore_api_url }}/project/{{ project_response.json.id }}/repositories"
+  ansible.builtin.uri:
+    url: "{{ semaphore_api_url }}/project/{{ project_response.json.id }}/repositories"
+    method: POST
+    body_format: json
+    # The interesting syntax below is to force the project ID to int
+    body: >
+      { "id": 0,
+        "name": "Local Playbooks",
+        "git_url": "/git",
+        "project_id": {{ project_response.json.id | int }},
+        "git_branch": "",
+        "ssh_key_id": 1
+      }
+    headers:
+      Content-Type: application/json
+      Authorization: "Bearer {{ semaphore_api_token }}"
+    status_code: [200, 201]
+  register: repository_result
+
+- name: Create user "{{ semaphore_api_url }}/users"
+  ansible.builtin.uri:
+    url: "{{ semaphore_api_url }}/users"
+    method: POST
+    body_format: json
+    body:
+      name: "Heath Young"
+      username: "hyoung"
+      email: "heath@posit.co"
+      password: "{{ semaphore_admin_password }}"
+      alert: true
+      admin: true
+      external: false
+    headers:
+      Content-Type: application/json
+      Authorization: "Bearer {{ semaphore_api_token }}"
+    status_code: [200, 201]
+  register: user_result
+
+- name: Display setup summary
+  ansible.builtin.debug:
+    msg:
+      - "Semaphore UI setup completed successfully!"
+      - ""
+      - "Access URL: http://localhost:{{ semaphore_host_port }}"
+      - "Admin User: {{ semaphore_admin_user }}"
+      - "Admin Password: {{ semaphore_admin_password }}"
+      - ""
+      - "API Token: {{ semaphore_api_token }}"
+      - "Project '{{ semaphore_project_name }}' ID: {{ project_response.json.id }}"
+      - "Inventory {{ inventory_result.json.name }} ID: {{ inventory_result.json.id }}"
+      - "Repository {{ repository_result.json.name }} ID: {{ repository_result.json.id }}"
+      - "User {{ user_result.json.name }} ID: {{ user_result.json.id }}"

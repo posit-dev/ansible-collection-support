@@ -1,0 +1,10 @@
+---
+# tasks/main.yml - Main tasks for semaphore_ui role
+
+- name: Include cleanup tasks
+  ansible.builtin.include_tasks: cleanup.yml
+  when: cleanup | bool
+
+- name: Include setup tasks
+  ansible.builtin.include_tasks: setup.yml
+  when: not (cleanup | bool)

@@ -1,0 +1,27 @@
+---
+# defaults/main.yml - Default variables for semaphore_ui role
+
+# Cleanup mode - when true, stops and removes container and storage
+cleanup: false
+
+# Container settings
+semaphore_container_name: semaphore
+semaphore_image: docker.io/semaphoreui/semaphore:latest
+semaphore_port: 3000
+semaphore_host_port: 3000
+
+# Volume settings
+semaphore_volume_name: semaphore_data
+
+# Admin user settings
+semaphore_admin_user: admin
+semaphore_admin_email: admin@localhost
+semaphore_admin_name: "Admin User"
+
+# Project settings
+semaphore_project_name: "Ansible Tests"
+
+# API settings
+semaphore_api_url: "http://localhost:{{ semaphore_host_port }}/api"
+semaphore_wait_timeout: 120
+semaphore_wait_delay: 5

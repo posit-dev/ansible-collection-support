@@ -1,0 +1,21 @@
+---
+# Example playbook for semaphore_ui role
+# Usage:
+#   Deploy:  ansible-playbook playbook.yml
+#   Cleanup: ansible-playbook playbook.yml -e cleanup=true
+
+- name: Manage SemaphoreUI Container
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: true
+
+  vars:   
+    # Customize these as needed
+    semaphore_admin_user: admin
+    semaphore_admin_email: admin@localhost
+    semaphore_host_port: 3000
+    semaphore_project_name: "Ansible Tests"
+
+  roles:
+    - role: semaphore_ui
