@@ -6,19 +6,27 @@
     that:
       - semaphore_api_endpoint is defined
       - semaphore_api_endpoint != ""
-      - semaphore_api_endpoint in ['inventory', 'task', 'variable_groups', 'repository', 'keys', 'templates', 'schedules']
-      - semaphore_project_id is defined
+      - semaphore_api_endpoint in semaphore_valid_endpoints
       - semaphore_api_base_url is defined
     fail_msg: |
       Required variables are not set or invalid.
-      - semaphore_api_endpoint must be one of: inventory, task, variable_groups, repository, keys, templates, schedules
-      - semaphore_project_id must be set
+      - semaphore_api_endpoint must be one of: {{ semaphore_valid_endpoints | join(', ') }}
       - semaphore_api_base_url must be set
       Current values:
         endpoint: {{ semaphore_api_endpoint | default('NOT SET') }}
-        project_id: {{ semaphore_project_id | default('NOT SET') }}
         base_url: {{ semaphore_api_base_url | default('NOT SET') }}
     success_msg: "All required variables are valid"
+
+- name: Validate project_id for project-scoped endpoints
+  ansible.builtin.assert:
+    that:
+      - semaphore_project_id is defined
+      - semaphore_project_id | int > 0
+    fail_msg: |
+      The '{{ semaphore_api_endpoint }}' endpoint requires semaphore_project_id to be set.
+      Current value: {{ semaphore_project_id | default('NOT SET') }}
+    success_msg: "Project ID validation passed"
+  when: semaphore_endpoint_config[semaphore_api_endpoint].requires_project | default(true)
 
 - name: Validate authentication credentials
   ansible.builtin.assert:
@@ -32,37 +40,13 @@
     msg:
       - "=== Semaphore API GET Request ==="
       - "Endpoint: {{ semaphore_api_endpoint }}"
-      - "Project ID: {{ semaphore_project_id }}"
+      - "Project ID: {{ semaphore_project_id | default('N/A (global endpoint)') }}"
       - "Resource ID: {{ semaphore_resource_id | default('all', true) }}"
       - "API Base URL: {{ semaphore_api_base_url }}"
       - "Authentication: {% if semaphore_api_token != '' %}Token{% else %}Basic Auth{% endif %}"
       - "Query Parameters: {{ semaphore_api_query_params | length }} parameter(s)"
   when: semaphore_api_debug | bool
 
-- name: Call inventory endpoint
-  ansible.builtin.include_tasks: inventory.yml
-  when: semaphore_api_endpoint == 'inventory'
-
-- name: Call task endpoint
-  ansible.builtin.include_tasks: task.yml
-  when: semaphore_api_endpoint == 'task'
-
-- name: Call variable groups endpoint
-  ansible.builtin.include_tasks: variable_groups.yml
-  when: semaphore_api_endpoint == 'variable_groups'
-
-- name: Call repository endpoint
-  ansible.builtin.include_tasks: repository.yml
-  when: semaphore_api_endpoint == 'repository'
-
-- name: Call keys endpoint
-  ansible.builtin.include_tasks: keys.yml
-  when: semaphore_api_endpoint == 'keys'
-
-- name: Call templates endpoint
-  ansible.builtin.include_tasks: templates.yml
-  when: semaphore_api_endpoint == 'templates'
-
-- name: Call schedules endpoint
-  ansible.builtin.include_tasks: schedules.yml
-  when: semaphore_api_endpoint == 'schedules'
+# Use the generic endpoint handler for all endpoints
+- name: Execute endpoint request
+  ansible.builtin.include_tasks: generic_endpoint.yml

@@ -1,6 +1,6 @@
 # Ansible Role: semaphore-api-get
 
-An Ansible role for making GET requests to Semaphore UI API endpoints. This role supports retrieving data from inventory, task, variable groups, repository, keys, templates, and schedules endpoints with built-in error handling, retry logic, and query parameter support.
+An Ansible role for making GET requests to Semaphore UI API endpoints. This role supports retrieving data from 13 different endpoints with built-in error handling, retry logic, and query parameter support.
 
 ## Table of Contents
 
@@ -16,6 +16,7 @@ An Ansible role for making GET requests to Semaphore UI API endpoints. This role
   - [Query Parameters](#query-parameters)
   - [Debug Output Control](#debug-output-control)
   - [Response Validation](#response-validation)
+  - [Response Metadata](#response-metadata)
 - [API Endpoint Details](#api-endpoint-details)
 - [Testing](#testing)
 - [Troubleshooting](#troubleshooting)
@@ -32,9 +33,15 @@ An Ansible role for making GET requests to Semaphore UI API endpoints. This role
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `semaphore_api_endpoint` | The API endpoint to call | `inventory`, `task`, `variable_groups`, `repository`, `keys`, `templates`, `schedules` |
-| `semaphore_project_id` | The Semaphore project ID | `1` |
+| `semaphore_api_endpoint` | The API endpoint to call | See [Supported Endpoints](#supported-endpoints) |
 | `semaphore_api_base_url` | Base URL for the Semaphore API | `http://localhost:3000/api` |
+
+### Conditionally Required Variables
+
+| Variable | Description | Required When |
+|----------|-------------|---------------|
+| `semaphore_project_id` | The Semaphore project ID | Project-scoped endpoints |
+| `semaphore_resource_id` | Specific resource ID | `task_output` endpoint |
 
 ### Authentication Variables
 
@@ -61,6 +68,9 @@ An Ansible role for making GET requests to Semaphore UI API endpoints. This role
 | `semaphore_api_follow_redirects` | Follow HTTP redirects | `all` |
 | `semaphore_api_return_content` | Return response content | `true` |
 | `semaphore_api_status_code` | Expected HTTP status code | `200` |
+| `semaphore_api_expected_status_codes` | List of acceptable HTTP status codes | `[200]` |
+| `semaphore_api_validate_json` | Validate response is JSON | `true` |
+| `semaphore_api_store_metadata` | Store response metadata in fact | `true` |
 
 ### Facts Set by Role
 
@@ -68,54 +78,28 @@ The role automatically sets the `semaphore_ui_api` fact from the `semaphore_api_
 
 ## Supported Endpoints
 
-### 1. Inventory Endpoint
-Retrieves inventory configurations for a project.
+### Project-Scoped Endpoints (require `semaphore_project_id`)
 
-**Endpoint**: `inventory`
-**API Path**: `/api/project/{project_id}/inventory[/{inventory_id}]`
-**Returns**: List of inventories or a specific inventory
+| Endpoint | Description | API Path |
+|----------|-------------|----------|
+| `inventory` | Inventory configurations | `/api/project/{id}/inventory` |
+| `task` | Task execution history | `/api/project/{id}/tasks` |
+| `variable_groups` | Environment variables | `/api/project/{id}/environment` |
+| `repository` | Repository configurations | `/api/project/{id}/repositories` |
+| `keys` | SSH/access keys | `/api/project/{id}/keys` |
+| `templates` | Task templates | `/api/project/{id}/templates` |
+| `schedules` | Scheduled tasks | `/api/project/{id}/schedules` |
+| `events` | Activity/event log | `/api/project/{id}/events` |
+| `views` | Project views | `/api/project/{id}/views` |
+| `task_output` | Task output (requires `resource_id`) | `/api/project/{id}/tasks/{task_id}/output` |
 
-### 2. Task Endpoint
-Retrieves task execution history and status.
+### Global Endpoints (do not require `semaphore_project_id`)
 
-**Endpoint**: `task`
-**API Path**: `/api/project/{project_id}/tasks[/{task_id}]`
-**Returns**: List of tasks or a specific task
-
-### 3. Variable Groups Endpoint
-Retrieves environment variables and variable groups.
-
-**Endpoint**: `variable_groups`
-**API Path**: `/api/project/{project_id}/environment[/{env_id}]`
-**Returns**: List of variable groups or a specific variable group
-
-### 4. Repository Endpoint
-Retrieves repository configurations linked to a project.
-
-**Endpoint**: `repository`
-**API Path**: `/api/project/{project_id}/repositories[/{repo_id}]`
-**Returns**: List of repositories or a specific repository
-
-### 5. Keys Endpoint
-Retrieves SSH keys and access keys for a project.
-
-**Endpoint**: `keys`
-**API Path**: `/api/project/{project_id}/keys[/{key_id}]`
-**Returns**: List of keys or a specific key
-
-### 6. Templates Endpoint
-Retrieves task templates for a project.
-
-**Endpoint**: `templates`
-**API Path**: `/api/project/{project_id}/templates[/{template_id}]`
-**Returns**: List of templates or a specific template
-
-### 7. Schedules Endpoint
-Retrieves scheduled tasks for a project.
-
-**Endpoint**: `schedules`
-**API Path**: `/api/project/{project_id}/schedules[/{schedule_id}]`
-**Returns**: List of schedules or a specific schedule
+| Endpoint | Description | API Path |
+|----------|-------------|----------|
+| `projects` | List all projects | `/api/projects` |
+| `users` | List all users (admin) | `/api/users` |
+| `user` | Current user info | `/api/user` |
 
 ## Dependencies
 
@@ -165,89 +149,124 @@ None.
         var: semaphore_task_data
 ```
 
-### Example 3: Get All Variable Groups
+### Example 3: Get Task Output
 
 ```yaml
 ---
-- name: Get all variable groups from Semaphore
-  hosts: localhost
-  vars:
-    semaphore_api_base_url: "http://semaphore.example.com:3000/api"
-    semaphore_api_token: "your-api-token-here"
-    semaphore_project_id: 2
-    semaphore_api_endpoint: "variable_groups"
-  roles:
-    - semaphore-api-get
-
-  post_tasks:
-    - name: Display variable groups
-      ansible.builtin.debug:
-        var: semaphore_variable_groups_data
-```
-
-### Example 4: Get All Repositories
-
-```yaml
----
-- name: Get all repositories from Semaphore
+- name: Get output from a specific task
   hosts: localhost
   vars:
     semaphore_api_base_url: "http://localhost:3000/api"
     semaphore_api_token: "your-api-token-here"
     semaphore_project_id: 1
-    semaphore_api_endpoint: "repository"
+    semaphore_api_endpoint: "task_output"
+    semaphore_resource_id: "42"  # Required for task_output
   roles:
     - semaphore-api-get
 
   post_tasks:
-    - name: Display repositories
+    - name: Display task output
       ansible.builtin.debug:
-        var: semaphore_repository_data
+        var: semaphore_task_output_data
 ```
 
-### Example 5: Using with semaphore_ui_api Fact
+### Example 4: List All Projects (Global Endpoint)
 
 ```yaml
 ---
-- name: Setup Semaphore and retrieve data
-  hosts: localhost
-  tasks:
-    - name: Setup Semaphore UI
-      ansible.builtin.include_role:
-        name: semaphore_ui
-      vars:
-        semaphore_admin_password: "secure-password"
-
-    - name: Get inventories using semaphore_ui_api fact
-      ansible.builtin.include_role:
-        name: semaphore-api-get
-      vars:
-        semaphore_project_id: 1
-        semaphore_api_endpoint: "inventory"
-        semaphore_api_token: "{{ semaphore_api_token }}"
-
-    - name: Display retrieved inventories
-      ansible.builtin.debug:
-        var: semaphore_inventory_data
-```
-
-### Example 6: Disable SSL Verification (Development Only)
-
-```yaml
----
-- name: Get data with SSL verification disabled
+- name: Get all projects from Semaphore
   hosts: localhost
   vars:
-    semaphore_api_base_url: "https://semaphore.local:3000/api"
+    semaphore_api_base_url: "http://localhost:3000/api"
+    semaphore_api_token: "your-api-token-here"
+    semaphore_api_endpoint: "projects"
+    # Note: project_id not required for global endpoints
+  roles:
+    - semaphore-api-get
+
+  post_tasks:
+    - name: Display all projects
+      ansible.builtin.debug:
+        var: semaphore_projects_data
+```
+
+### Example 5: Get Current User Info
+
+```yaml
+---
+- name: Get current authenticated user info
+  hosts: localhost
+  vars:
+    semaphore_api_base_url: "http://localhost:3000/api"
+    semaphore_api_token: "your-api-token-here"
+    semaphore_api_endpoint: "user"
+  roles:
+    - semaphore-api-get
+
+  post_tasks:
+    - name: Display current user
+      ansible.builtin.debug:
+        var: semaphore_current_user_data
+```
+
+### Example 6: Get Project Events/Activity Log
+
+```yaml
+---
+- name: Get project activity log
+  hosts: localhost
+  vars:
+    semaphore_api_base_url: "http://localhost:3000/api"
     semaphore_api_token: "your-api-token-here"
     semaphore_project_id: 1
-    semaphore_api_endpoint: "inventory"
-    semaphore_api_validate_certs: false
+    semaphore_api_endpoint: "events"
+  roles:
+    - semaphore-api-get
+
+  post_tasks:
+    - name: Display project events
+      ansible.builtin.debug:
+        var: semaphore_events_data
+```
+
+### Example 7: Using Query Parameters
+
+```yaml
+---
+- name: Get tasks with query parameters
+  hosts: localhost
+  vars:
+    semaphore_api_base_url: "http://localhost:3000/api"
+    semaphore_api_token: "your-api-token-here"
+    semaphore_project_id: 1
+    semaphore_api_endpoint: "task"
+    semaphore_api_query_params:
+      sort: "start"
+      order: "desc"
   roles:
     - semaphore-api-get
 ```
 
-### Example 7: Get All Templates
+### Example 8: Get All Users (Admin Only)
+
+```yaml
+---
+- name: Get all users from Semaphore
+  hosts: localhost
+  vars:
+    semaphore_api_base_url: "http://localhost:3000/api"
+    semaphore_api_token: "your-admin-api-token"
+    semaphore_api_endpoint: "users"
+  roles:
+    - semaphore-api-get
+
+  post_tasks:
+    - name: Display all users
+      ansible.builtin.debug:
+        var: semaphore_users_data
+```
+
+### Example 9: Get All Templates
 
 ```yaml
 ---
@@ -267,81 +286,7 @@ None.
         var: semaphore_templates_data
 ```
 
-### Example 8: Get All Keys
-
-```yaml
----
-- name: Get all SSH keys from Semaphore
-  hosts: localhost
-  vars:
-    semaphore_api_base_url: "http://localhost:3000/api"
-    semaphore_api_token: "your-api-token-here"
-    semaphore_project_id: 1
-    semaphore_api_endpoint: "keys"
-  roles:
-    - semaphore-api-get
-
-  post_tasks:
-    - name: Display keys
-      ansible.builtin.debug:
-        var: semaphore_keys_data
-```
-
-### Example 9: Using Query Parameters
-
-```yaml
----
-- name: Get tasks with query parameters
-  hosts: localhost
-  vars:
-    semaphore_api_base_url: "http://localhost:3000/api"
-    semaphore_api_token: "your-api-token-here"
-    semaphore_project_id: 1
-    semaphore_api_endpoint: "task"
-    semaphore_api_query_params:
-      sort: "start"
-      order: "desc"
-  roles:
-    - semaphore-api-get
-```
-
-### Example 10: Disable Debug Output
-
-```yaml
----
-- name: Get data without debug output
-  hosts: localhost
-  vars:
-    semaphore_api_base_url: "http://localhost:3000/api"
-    semaphore_api_token: "your-api-token-here"
-    semaphore_project_id: 1
-    semaphore_api_endpoint: "inventory"
-    semaphore_api_debug: false
-  roles:
-    - semaphore-api-get
-```
-
-### Example 11: Get All Schedules
-
-```yaml
----
-- name: Get all schedules from Semaphore
-  hosts: localhost
-  vars:
-    semaphore_api_base_url: "http://localhost:3000/api"
-    semaphore_api_token: "your-api-token-here"
-    semaphore_project_id: 1
-    semaphore_api_endpoint: "schedules"
-  roles:
-    - semaphore-api-get
-
-  post_tasks:
-    - name: Display schedules
-      ansible.builtin.debug:
-        var: semaphore_schedules_data
-```
-
-### Example 12: Custom Retry Configuration
+### Example 10: Custom Retry Configuration
 
 ```yaml
 ---
@@ -358,6 +303,46 @@ None.
     - semaphore-api-get
 ```
 
+### Example 11: Disable SSL Verification (Development Only)
+
+```yaml
+---
+- name: Get data with SSL verification disabled
+  hosts: localhost
+  vars:
+    semaphore_api_base_url: "https://semaphore.local:3000/api"
+    semaphore_api_token: "your-api-token-here"
+    semaphore_project_id: 1
+    semaphore_api_endpoint: "inventory"
+    semaphore_api_validate_certs: false
+  roles:
+    - semaphore-api-get
+```
+
+### Example 12: Access Response Metadata
+
+```yaml
+---
+- name: Get data and check response metadata
+  hosts: localhost
+  vars:
+    semaphore_api_base_url: "http://localhost:3000/api"
+    semaphore_api_token: "your-api-token-here"
+    semaphore_project_id: 1
+    semaphore_api_endpoint: "inventory"
+    semaphore_api_store_metadata: true
+  roles:
+    - semaphore-api-get
+
+  post_tasks:
+    - name: Display response metadata
+      ansible.builtin.debug:
+        msg:
+          - "Status: {{ semaphore_api_last_response.status }}"
+          - "Response time: {{ semaphore_api_last_response.elapsed }} seconds"
+          - "URL called: {{ semaphore_api_last_response.url }}"
+```
+
 ## Return Values
 
 Each endpoint sets a specific fact with the retrieved data:
@@ -371,8 +356,27 @@ Each endpoint sets a specific fact with the retrieved data:
 | `keys` | `semaphore_keys_data` | SSH keys data from API |
 | `templates` | `semaphore_templates_data` | Template data from API |
 | `schedules` | `semaphore_schedules_data` | Schedule data from API |
+| `events` | `semaphore_events_data` | Event/activity log data from API |
+| `views` | `semaphore_views_data` | View data from API |
+| `task_output` | `semaphore_task_output_data` | Task output data from API |
+| `projects` | `semaphore_projects_data` | Projects data from API |
+| `users` | `semaphore_users_data` | Users data from API |
+| `user` | `semaphore_current_user_data` | Current user data from API |
 
 All facts contain the parsed JSON response from the Semaphore API.
+
+### Response Metadata
+
+When `semaphore_api_store_metadata: true` (default), the role also sets:
+
+```yaml
+semaphore_api_last_response:
+  status: 200              # HTTP status code
+  elapsed: 0.123           # Response time in seconds
+  url: "http://..."        # Full URL called
+  endpoint: "inventory"    # Endpoint name
+  content_type: "application/json"
+```
 
 ## Authentication
 
@@ -403,22 +407,22 @@ vars:
 
 ### Error Handling and Retry Logic
 
-The role includes built-in error handling and automatic retry logic for API calls:
+The role includes built-in error handling with human-readable error messages:
 
 - **Automatic retries**: Failed API calls are automatically retried up to `semaphore_api_retries` times (default: 3)
 - **Configurable delay**: Delay between retries can be set with `semaphore_api_retry_delay` (default: 5 seconds)
-- **Clear error messages**: When an API call fails after all retries, a detailed error message is displayed with:
-  - HTTP status code
-  - Error message from the API
-  - The URL that was called
-  - Any API error details
+- **Status-specific messages**: Clear error messages for common HTTP status codes (401, 403, 404, 429, 5xx)
+- **Troubleshooting hints**: Contextual troubleshooting suggestions based on the error type
 
-Example with custom retry settings:
+Example error output:
+```
+API call failed for inventory endpoint.
 
-```yaml
-vars:
-  semaphore_api_retries: 5
-  semaphore_api_retry_delay: 10
+Status Code: 404
+Error: Not Found - The requested resource does not exist
+URL: http://localhost:3000/api/project/999/inventory
+
+Troubleshooting: Check that project_id=999 and resource_id=N/A exist.
 ```
 
 ### Query Parameters
@@ -453,7 +457,7 @@ Output includes:
 - Endpoint being called
 - Project and resource IDs
 - Authentication method
-- Response size and type
+- Response size, type, and time
 
 #### Verbose Debug Output
 
@@ -465,7 +469,6 @@ vars:
 Additional output:
 - Complete API response JSON
 - Full URL with query parameters
-- All HTTP headers
 
 #### Disable Debug Output
 
@@ -478,177 +481,64 @@ vars:
 
 The role automatically validates API responses:
 
-- **Status code check**: Ensures the response status matches the expected code
-- **JSON validation**: Verifies the response is valid JSON
+- **Status code check**: Ensures the response status matches expected codes
+- **JSON validation**: Verifies the response is valid JSON (configurable with `semaphore_api_validate_json`)
 - **Error detection**: Checks for API error messages in the response
 
-If validation fails, the role will:
-1. Display a detailed error message
-2. Fail the playbook execution
-3. Provide troubleshooting information
+### Response Metadata
+
+Access detailed information about the last API call:
+
+```yaml
+- name: Check response time
+  ansible.builtin.debug:
+    msg: "API responded in {{ semaphore_api_last_response.elapsed }} seconds"
+```
 
 ## API Endpoint Details
 
-### Inventory Endpoint
+### Project-Scoped Endpoints
 
-Returns inventory configurations including:
-- Inventory ID
-- Inventory name
-- Inventory type (static, dynamic, etc.)
-- Inventory source
-- SSH key associations
+#### Inventory Endpoint
+Returns inventory configurations including inventory ID, name, type, source, and SSH key associations.
 
-**Example Response Structure**:
-```json
-[
-  {
-    "id": 1,
-    "name": "Production Servers",
-    "project_id": 1,
-    "inventory": "inventory content here",
-    "type": "static",
-    "ssh_key_id": 1
-  }
-]
-```
+#### Task Endpoint
+Returns task execution data including task ID, status, output, timestamps, and template information.
 
-### Task Endpoint
+#### Variable Groups Endpoint
+Returns environment variable groups including variables and secrets.
 
-Returns task execution data including:
-- Task ID
-- Task status
-- Task output
-- Start and end times
-- Template information
+#### Repository Endpoint
+Returns repository configurations including Git URL, branch, and SSH key associations.
 
-**Example Response Structure**:
-```json
-[
-  {
-    "id": 42,
-    "template_id": 1,
-    "status": "success",
-    "start": "2024-01-15T10:30:00Z",
-    "end": "2024-01-15T10:35:00Z"
-  }
-]
-```
+#### Keys Endpoint
+Returns SSH keys and access keys including key type and public key data.
 
-### Variable Groups Endpoint
+#### Templates Endpoint
+Returns task templates including playbook filename, associations, and template type.
 
-Returns environment variable groups including:
-- Variable group ID
-- Variable group name
-- Environment variables
-- Secrets (if accessible)
+#### Schedules Endpoint
+Returns scheduled task executions including cron expression and enabled status.
 
-**Example Response Structure**:
-```json
-[
-  {
-    "id": 1,
-    "name": "Production Vars",
-    "project_id": 1,
-    "variables": [
-      {
-        "name": "ENVIRONMENT",
-        "value": "production"
-      }
-    ]
-  }
-]
-```
+#### Events Endpoint
+Returns project activity log including user actions and timestamps.
 
-### Repository Endpoint
+#### Views Endpoint
+Returns project views for organizing templates.
 
-Returns repository configurations including:
-- Repository ID
-- Repository name
-- Git URL
-- Branch information
-- SSH key associations
+#### Task Output Endpoint
+Returns the output/logs for a specific task execution. Requires `semaphore_resource_id` to be set.
 
-**Example Response Structure**:
-```json
-[
-  {
-    "id": 1,
-    "name": "Main Ansible Repo",
-    "project_id": 1,
-    "git_url": "https://github.com/user/repo.git",
-    "git_branch": "main",
-    "ssh_key_id": 1
-  }
-]
-```
+### Global Endpoints
 
-### Keys Endpoint
+#### Projects Endpoint
+Returns all projects the authenticated user has access to.
 
-Returns SSH keys and access keys including:
-- Key ID
-- Key name
-- Key type (ssh, login_password, none)
-- Public key (for SSH keys)
+#### Users Endpoint
+Returns all users (requires admin privileges).
 
-**Example Response Structure**:
-```json
-[
-  {
-    "id": 1,
-    "name": "Production SSH Key",
-    "project_id": 1,
-    "type": "ssh",
-    "secret": "encrypted_private_key_data"
-  }
-]
-```
-
-### Templates Endpoint
-
-Returns task templates including:
-- Template ID
-- Template name
-- Playbook filename
-- Inventory, repository, and environment associations
-- Template type (task, build, deploy)
-
-**Example Response Structure**:
-```json
-[
-  {
-    "id": 1,
-    "name": "Deploy Application",
-    "project_id": 1,
-    "playbook": "deploy.yml",
-    "inventory_id": 1,
-    "repository_id": 1,
-    "environment_id": 1,
-    "type": "deploy"
-  }
-]
-```
-
-### Schedules Endpoint
-
-Returns scheduled task executions including:
-- Schedule ID
-- Cron expression
-- Template association
-- Next run time
-- Enabled status
-
-**Example Response Structure**:
-```json
-[
-  {
-    "id": 1,
-    "project_id": 1,
-    "template_id": 1,
-    "cron_format": "0 2 * * *",
-    "active": true
-  }
-]
-```
+#### User Endpoint
+Returns information about the currently authenticated user.
 
 ## Testing
 
@@ -662,17 +552,37 @@ ansible-playbook tests/test.yml
 
 ### Common Issues
 
-1. **401 Unauthorized**: Check your API token or credentials
-2. **404 Not Found**: Verify the project ID and resource ID exist
-3. **SSL Certificate Error**: Set `semaphore_api_validate_certs: false` for self-signed certs (development only)
-4. **Connection Timeout**: Increase `semaphore_api_timeout` value
+| Status Code | Error | Solution |
+|-------------|-------|----------|
+| 401 | Unauthorized | Check your API token or username/password credentials |
+| 403 | Forbidden | Verify the user has permission to access this resource |
+| 404 | Not Found | Check that project_id and resource_id exist |
+| 429 | Too Many Requests | Increase `semaphore_api_retry_delay` or reduce request frequency |
+| 5xx | Server Error | Check Semaphore server logs for details |
+
+### SSL Certificate Issues
+
+For self-signed certificates (development only):
+
+```yaml
+vars:
+  semaphore_api_validate_certs: false
+```
 
 ### Debug Mode
 
-Enable debug output by running with verbose flags:
+Enable verbose output by running with verbose flags:
 
 ```bash
 ansible-playbook your-playbook.yml -vvv
+```
+
+Or enable role-level debugging:
+
+```yaml
+vars:
+  semaphore_api_debug: true
+  semaphore_api_verbose_debug: true
 ```
 
 ## License

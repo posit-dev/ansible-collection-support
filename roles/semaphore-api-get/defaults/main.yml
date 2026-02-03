@@ -9,13 +9,15 @@ semaphore_api_token: ""
 semaphore_api_user: "admin"
 semaphore_api_password: "changeme"
 
-# Endpoint to call - options: inventory, task, variable_groups, repository, keys, templates, schedules
+# Endpoint to call
+# Project-scoped endpoints: inventory, task, variable_groups, repository, keys, templates, schedules, events, views, task_output
+# Global endpoints: projects, users, user
 semaphore_api_endpoint: ""
 
-# Project ID for API calls (most endpoints require this)
+# Project ID for API calls (required for project-scoped endpoints)
 semaphore_project_id: 1
 
-# Resource ID for specific resource lookups (optional)
+# Resource ID for specific resource lookups (optional for most endpoints, required for task_output)
 semaphore_resource_id: ""
 
 # Additional query parameters (optional)
@@ -30,8 +32,23 @@ semaphore_api_retry_delay: 5
 semaphore_api_debug: true
 semaphore_api_verbose_debug: false
 
+# HTTP request settings
+semaphore_api_validate_certs: true
+semaphore_api_timeout: 30
+semaphore_api_follow_redirects: "all"
+
+# Response handling
+semaphore_api_return_content: true
+semaphore_api_status_code: 200
+semaphore_api_expected_status_codes: [200]
+semaphore_api_validate_json: true
+semaphore_api_store_metadata: true
+
 # Example configurations for each endpoint type
 # These show the typical structure for each endpoint
+
+# Project-scoped endpoints (require project_id)
+# ==============================================
 
 # Example: Get all inventories for a project
 semaphore_api_inventory_example:
@@ -75,11 +92,39 @@ semaphore_api_schedules_example:
   project_id: 1
   resource_id: ""  # Leave empty to get all schedules, or specify ID for specific schedule
 
-# HTTP request settings
-semaphore_api_validate_certs: true
-semaphore_api_timeout: 30
-semaphore_api_follow_redirects: "all"
+# Example: Get all events/activity log for a project
+semaphore_api_events_example:
+  endpoint: "events"
+  project_id: 1
+  resource_id: ""  # Leave empty to get all events
 
-# Response handling
-semaphore_api_return_content: true
-semaphore_api_status_code: 200
+# Example: Get all views for a project
+semaphore_api_views_example:
+  endpoint: "views"
+  project_id: 1
+  resource_id: ""  # Leave empty to get all views, or specify ID for specific view
+
+# Example: Get output for a specific task (requires resource_id)
+semaphore_api_task_output_example:
+  endpoint: "task_output"
+  project_id: 1
+  resource_id: "42"  # Required - the task ID to get output for
+
+# Global endpoints (do not require project_id)
+# =============================================
+
+# Example: Get all projects
+semaphore_api_projects_example:
+  endpoint: "projects"
+  # project_id not required
+  resource_id: ""  # Leave empty to get all projects, or specify ID for specific project
+
+# Example: Get all users (admin only)
+semaphore_api_users_example:
+  endpoint: "users"
+  # project_id not required
+
+# Example: Get current authenticated user info
+semaphore_api_user_example:
+  endpoint: "user"
+  # project_id not required

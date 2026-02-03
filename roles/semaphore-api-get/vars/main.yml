@@ -1,3 +1,92 @@
 ---
 # vars file for semaphore-api-get
 # Variables defined here have higher priority than defaults
+
+# Endpoint configuration mapping
+# This defines the API path and response variable for each endpoint
+semaphore_endpoint_config:
+  # Project-scoped endpoints (require project_id)
+  inventory:
+    path: "project/{{ semaphore_project_id }}/inventory"
+    response_var: "semaphore_inventory_data"
+    requires_project: true
+  task:
+    path: "project/{{ semaphore_project_id }}/tasks"
+    response_var: "semaphore_task_data"
+    requires_project: true
+  variable_groups:
+    path: "project/{{ semaphore_project_id }}/environment"
+    response_var: "semaphore_variable_groups_data"
+    requires_project: true
+  repository:
+    path: "project/{{ semaphore_project_id }}/repositories"
+    response_var: "semaphore_repository_data"
+    requires_project: true
+  keys:
+    path: "project/{{ semaphore_project_id }}/keys"
+    response_var: "semaphore_keys_data"
+    requires_project: true
+  templates:
+    path: "project/{{ semaphore_project_id }}/templates"
+    response_var: "semaphore_templates_data"
+    requires_project: true
+  schedules:
+    path: "project/{{ semaphore_project_id }}/schedules"
+    response_var: "semaphore_schedules_data"
+    requires_project: true
+  events:
+    path: "project/{{ semaphore_project_id }}/events"
+    response_var: "semaphore_events_data"
+    requires_project: true
+  views:
+    path: "project/{{ semaphore_project_id }}/views"
+    response_var: "semaphore_views_data"
+    requires_project: true
+  task_output:
+    path: "project/{{ semaphore_project_id }}/tasks/{{ semaphore_resource_id }}/output"
+    response_var: "semaphore_task_output_data"
+    requires_project: true
+    requires_resource: true
+  # Global endpoints (do not require project_id)
+  projects:
+    path: "projects"
+    response_var: "semaphore_projects_data"
+    requires_project: false
+  users:
+    path: "users"
+    response_var: "semaphore_users_data"
+    requires_project: false
+  user:
+    path: "user"
+    response_var: "semaphore_current_user_data"
+    requires_project: false
+
+# List of all valid endpoints for validation
+semaphore_valid_endpoints:
+  - inventory
+  - task
+  - variable_groups
+  - repository
+  - keys
+  - templates
+  - schedules
+  - events
+  - views
+  - task_output
+  - projects
+  - users
+  - user
+
+# HTTP status code messages for better error reporting
+semaphore_http_status_messages:
+  400: "Bad Request - The request was malformed or contains invalid parameters"
+  401: "Unauthorized - Invalid or missing authentication credentials"
+  403: "Forbidden - You don't have permission to access this resource"
+  404: "Not Found - The requested resource does not exist"
+  405: "Method Not Allowed - GET method not supported for this endpoint"
+  408: "Request Timeout - The server took too long to respond"
+  429: "Too Many Requests - Rate limit exceeded, please wait before retrying"
+  500: "Internal Server Error - The server encountered an unexpected error"
+  502: "Bad Gateway - The server received an invalid response from upstream"
+  503: "Service Unavailable - The server is temporarily unavailable"
+  504: "Gateway Timeout - The upstream server failed to respond in time"

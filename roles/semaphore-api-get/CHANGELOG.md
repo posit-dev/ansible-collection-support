@@ -2,6 +2,71 @@
 
 All notable changes to the semaphore-api-get role will be documented in this file.
 
+## [3.0.0] - 2026-02-03
+
+### Added
+- **New Endpoints**:
+  - `projects` - List all projects (global endpoint, no project_id required)
+  - `users` - List all users (admin only, global endpoint)
+  - `user` - Get current authenticated user info (global endpoint)
+  - `events` - Project activity/event log
+  - `views` - Project views for organizing templates
+  - `task_output` - Get output/logs for a specific task (requires resource_id)
+
+- **Global Endpoint Support**:
+  - Added support for endpoints that don't require project_id
+  - Automatic validation skips project_id check for global endpoints
+  - Clear distinction between project-scoped and global endpoints in documentation
+
+- **Enhanced Error Handling**:
+  - Human-readable error messages for common HTTP status codes (400, 401, 403, 404, 405, 408, 429, 5xx)
+  - Contextual troubleshooting suggestions based on error type
+  - Improved error output with status-specific guidance
+
+- **Response Metadata**:
+  - New `semaphore_api_last_response` fact with request metadata
+  - Includes: status code, elapsed time, URL, endpoint name, content-type
+  - Configurable via `semaphore_api_store_metadata` (default: true)
+
+- **New Configuration Options**:
+  - `semaphore_api_expected_status_codes` - List of acceptable HTTP status codes
+  - `semaphore_api_validate_json` - Toggle JSON validation (default: true)
+  - `semaphore_api_store_metadata` - Toggle metadata storage (default: true)
+
+- **Generic Endpoint Handler**:
+  - New `generic_endpoint.yml` task using configuration-driven approach
+  - Endpoint configuration defined in `vars/main.yml`
+  - Reduces code duplication and simplifies adding new endpoints
+
+### Changed
+- **Architecture Overhaul**:
+  - Replaced individual endpoint task files with generic handler
+  - Endpoint configuration now centralized in `vars/main.yml`
+  - Main task file reduced from 69 lines to 52 lines
+  - Simplified routing using configuration lookup
+
+- **Improved Validation**:
+  - Project_id validation only runs for project-scoped endpoints
+  - Resource_id validation for endpoints that require it (task_output)
+  - Better handling of endpoint requirements
+
+- **Enhanced Debug Output**:
+  - Added HTTP status code to response summary
+  - Added response time to debug output
+  - Improved verbose debug with full URL display
+
+- **Updated Documentation**:
+  - Reorganized README with project-scoped vs global endpoint sections
+  - Added 12 example playbooks covering all new features
+  - Updated return values table with all 13 endpoints
+  - Added response metadata documentation
+
+### Technical Improvements
+- **Code Reduction**: Main routing logic reduced by 75%
+- **Configuration-Driven**: All endpoint paths and response variables defined in vars
+- **Better Maintainability**: Adding new endpoints requires only vars update
+- **HTTP Status Mapping**: Centralized status code to message mapping
+
 ## [2.0.0] - 2026-02-03
 
 ### Added

@@ -10,7 +10,7 @@
     msg:
       - "Calling {{ api_endpoint_name }} endpoint"
       - "URL: {{ api_endpoint_url }}"
-      - "Project ID: {{ semaphore_project_id }}"
+      - "Project ID: {{ semaphore_project_id | default('N/A') }}"
       - "Resource ID: {{ semaphore_resource_id | default('all', true) }}"
       - "Query params: {{ semaphore_api_query_params }}"
   when: semaphore_api_debug | bool
@@ -36,13 +36,14 @@
     headers:
       Authorization: "Bearer {{ semaphore_api_token }}"
       Content-Type: "application/json"
+      Accept: "application/json"
     validate_certs: "{{ semaphore_api_validate_certs }}"
     timeout: "{{ semaphore_api_timeout }}"
     follow_redirects: "{{ semaphore_api_follow_redirects }}"
     return_content: "{{ semaphore_api_return_content }}"
-    status_code: "{{ semaphore_api_status_code }}"
+    status_code: "{{ semaphore_api_expected_status_codes | default([semaphore_api_status_code]) }}"
   register: api_response
-  until: api_response.status == semaphore_api_status_code
+  until: api_response.status in (semaphore_api_expected_status_codes | default([semaphore_api_status_code]))
   retries: "{{ semaphore_api_retries }}"
   delay: "{{ semaphore_api_retry_delay }}"
   when: semaphore_api_token is defined and semaphore_api_token != ""
@@ -57,46 +58,76 @@
     force_basic_auth: true
     headers:
       Content-Type: "application/json"
+      Accept: "application/json"
     validate_certs: "{{ semaphore_api_validate_certs }}"
     timeout: "{{ semaphore_api_timeout }}"
     follow_redirects: "{{ semaphore_api_follow_redirects }}"
     return_content: "{{ semaphore_api_return_content }}"
-    status_code: "{{ semaphore_api_status_code }}"
+    status_code: "{{ semaphore_api_expected_status_codes | default([semaphore_api_status_code]) }}"
   register: api_response
-  until: api_response.status == semaphore_api_status_code
+  until: api_response.status in (semaphore_api_expected_status_codes | default([semaphore_api_status_code]))
   retries: "{{ semaphore_api_retries }}"
   delay: "{{ semaphore_api_retry_delay }}"
   when: semaphore_api_token is not defined or semaphore_api_token == ""
   failed_when: false
 
+- name: Get human-readable error message for status code
+  ansible.builtin.set_fact:
+    _status_message: "{{ semaphore_http_status_messages[api_response.status] | default('Unknown error') }}"
+  when: api_response.status is defined and api_response.status != semaphore_api_status_code
+
 - name: Check if API call was successful
   ansible.builtin.assert:
     that:
       - api_response.status is defined
-      - api_response.status == semaphore_api_status_code
+      - api_response.status in (semaphore_api_expected_status_codes | default([semaphore_api_status_code]))
     fail_msg: |
       API call failed for {{ api_endpoint_name }} endpoint.
-      Status: {{ api_response.status | default('N/A') }}
-      Message: {{ api_response.msg | default('No error message available') }}
+
+      Status Code: {{ api_response.status | default('N/A') }}
+      Error: {{ _status_message | default('Unknown error') }}
       URL: {{ final_api_url }}
-      {% if api_response.json is defined and api_response.json.error is defined %}
-      API Error: {{ api_response.json.error }}
+
+      {% if api_response.status | default(0) == 401 %}
+      Troubleshooting: Check your API token or username/password credentials.
+      {% elif api_response.status | default(0) == 403 %}
+      Troubleshooting: Verify the user has permission to access this project/resource.
+      {% elif api_response.status | default(0) == 404 %}
+      Troubleshooting: Check that project_id={{ semaphore_project_id | default('N/A') }} and resource_id={{ semaphore_resource_id | default('N/A') }} exist.
+      {% elif api_response.status | default(0) == 429 %}
+      Troubleshooting: Rate limit hit. Increase semaphore_api_retry_delay or reduce request frequency.
+      {% elif api_response.status | default(0) >= 500 %}
+      Troubleshooting: This is a server-side error. Check Semaphore server logs.
       {% endif %}
-    success_msg: "Successfully retrieved data from {{ api_endpoint_name }} endpoint"
+
+      {% if api_response.json is defined and api_response.json.error is defined %}
+      API Error Details: {{ api_response.json.error }}
+      {% elif api_response.json is defined and api_response.json.message is defined %}
+      API Message: {{ api_response.json.message }}
+      {% endif %}
+
+      Raw Response: {{ api_response.msg | default('No error message available') }}
+    success_msg: "Successfully retrieved data from {{ api_endpoint_name }} endpoint (HTTP {{ api_response.status }})"
 
 - name: Validate response is JSON
   ansible.builtin.assert:
     that:
       - api_response.json is defined
-    fail_msg: "API response is not valid JSON for {{ api_endpoint_name }} endpoint"
+    fail_msg: |
+      API response is not valid JSON for {{ api_endpoint_name }} endpoint.
+      Content-Type received: {{ api_response.content_type | default('unknown') }}
+      Response body (truncated): {{ api_response.content[:500] | default('empty') }}...
     success_msg: "Response is valid JSON"
+  when: semaphore_api_validate_json | default(true)
 
 - name: Display response summary
   ansible.builtin.debug:
     msg:
       - "Successfully retrieved data from {{ api_endpoint_name }}"
+      - "HTTP Status: {{ api_response.status }}"
       - "Response type: {{ api_response.json | type_debug }}"
       - "Response size: {% if api_response.json is iterable and api_response.json is not string and api_response.json is not mapping %}{{ api_response.json | length }} items{% else %}1 item{% endif %}"
+      - "Response time: {{ api_response.elapsed | default('N/A') }} seconds"
   when: semaphore_api_debug | bool
 
 - name: Display full response
@@ -107,3 +138,13 @@
 - name: Set response fact
   ansible.builtin.set_fact:
     "{{ api_response_var }}": "{{ api_response.json }}"
+
+- name: Set response metadata fact
+  ansible.builtin.set_fact:
+    semaphore_api_last_response:
+      status: "{{ api_response.status }}"
+      elapsed: "{{ api_response.elapsed | default(0) }}"
+      url: "{{ final_api_url }}"
+      endpoint: "{{ api_endpoint_name }}"
+      content_type: "{{ api_response.content_type | default('application/json') }}"
+  when: semaphore_api_store_metadata | default(true)
