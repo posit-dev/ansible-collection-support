@@ -1,0 +1,32 @@
+---
+galaxy_info:
+  author: Your Name
+  description: Ansible role for making GET requests to Semaphore UI API endpoints
+  company: Your Company
+
+  license: MIT
+
+  min_ansible_version: "2.9"
+
+  platforms:
+    - name: Fedora
+      versions:
+        - all
+    - name: Debian
+      versions:
+        - all
+    - name: Ubuntu
+      versions:
+        - all
+    - name: EL
+      versions:
+        - all
+
+  galaxy_tags:
+    - semaphore
+    - api
+    - automation
+    - ci
+    - cd
+
+dependencies: []

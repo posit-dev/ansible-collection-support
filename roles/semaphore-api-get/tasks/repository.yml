@@ -1,0 +1,11 @@
+---
+# tasks/repository.yml - GET calls to repository endpoint
+
+- name: Set repository API URL
+  ansible.builtin.set_fact:
+    api_endpoint_url: "{{ semaphore_api_base_url }}/project/{{ semaphore_project_id }}/repositories{% if semaphore_resource_id != '' and semaphore_resource_id != None %}/{{ semaphore_resource_id }}{% endif %}"
+    api_endpoint_name: "repository"
+    api_response_var: "semaphore_repository_data"
+
+- name: Execute API call for repositories
+  ansible.builtin.include_tasks: common_api_call.yml

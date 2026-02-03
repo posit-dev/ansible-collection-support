@@ -1,0 +1,11 @@
+---
+# tasks/variable_groups.yml - GET calls to variable groups (environment) endpoint
+
+- name: Set variable groups API URL
+  ansible.builtin.set_fact:
+    api_endpoint_url: "{{ semaphore_api_base_url }}/project/{{ semaphore_project_id }}/environment{% if semaphore_resource_id != '' and semaphore_resource_id != None %}/{{ semaphore_resource_id }}{% endif %}"
+    api_endpoint_name: "variable_groups"
+    api_response_var: "semaphore_variable_groups_data"
+
+- name: Execute API call for variable groups
+  ansible.builtin.include_tasks: common_api_call.yml

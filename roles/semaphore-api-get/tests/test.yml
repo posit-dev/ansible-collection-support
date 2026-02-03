@@ -1,0 +1,115 @@
+---
+# Test playbook for semaphore-api-get role
+
+- name: Test Semaphore API GET operations
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    # Configure these variables for your Semaphore instance
+    semaphore_api_base_url: "http://localhost:3000/api"
+    semaphore_api_token: ""  # Set your API token here
+    semaphore_api_user: "admin"
+    semaphore_api_password: "changeme"
+    semaphore_project_id: 1
+    semaphore_api_validate_certs: false  # Set to true for production
+
+  tasks:
+    - name: Test 1 - Get all inventories
+      ansible.builtin.include_role:
+        name: semaphore-api-get
+      vars:
+        semaphore_api_endpoint: "inventory"
+
+    - name: Display inventory results
+      ansible.builtin.debug:
+        msg: "Retrieved {{ semaphore_inventory_data | length }} inventories"
+      when: semaphore_inventory_data is defined
+
+    - name: Test 2 - Get all tasks
+      ansible.builtin.include_role:
+        name: semaphore-api-get
+      vars:
+        semaphore_api_endpoint: "task"
+
+    - name: Display task results
+      ansible.builtin.debug:
+        msg: "Retrieved {{ semaphore_task_data | length }} tasks"
+      when: semaphore_task_data is defined
+
+    - name: Test 3 - Get all variable groups
+      ansible.builtin.include_role:
+        name: semaphore-api-get
+      vars:
+        semaphore_api_endpoint: "variable_groups"
+
+    - name: Display variable groups results
+      ansible.builtin.debug:
+        msg: "Retrieved {{ semaphore_variable_groups_data | length }} variable groups"
+      when: semaphore_variable_groups_data is defined
+
+    - name: Test 4 - Get all repositories
+      ansible.builtin.include_role:
+        name: semaphore-api-get
+      vars:
+        semaphore_api_endpoint: "repository"
+
+    - name: Display repository results
+      ansible.builtin.debug:
+        msg: "Retrieved {{ semaphore_repository_data | length }} repositories"
+      when: semaphore_repository_data is defined
+
+    - name: Test 5 - Get all keys
+      ansible.builtin.include_role:
+        name: semaphore-api-get
+      vars:
+        semaphore_api_endpoint: "keys"
+
+    - name: Display keys results
+      ansible.builtin.debug:
+        msg: "Retrieved {{ semaphore_keys_data | length }} keys"
+      when: semaphore_keys_data is defined
+
+    - name: Test 6 - Get all templates
+      ansible.builtin.include_role:
+        name: semaphore-api-get
+      vars:
+        semaphore_api_endpoint: "templates"
+
+    - name: Display templates results
+      ansible.builtin.debug:
+        msg: "Retrieved {{ semaphore_templates_data | length }} templates"
+      when: semaphore_templates_data is defined
+
+    - name: Test 7 - Get all schedules
+      ansible.builtin.include_role:
+        name: semaphore-api-get
+      vars:
+        semaphore_api_endpoint: "schedules"
+
+    - name: Display schedules results
+      ansible.builtin.debug:
+        msg: "Retrieved {{ semaphore_schedules_data | length }} schedules"
+      when: semaphore_schedules_data is defined
+
+    - name: Test 8 - Test with query parameters
+      ansible.builtin.include_role:
+        name: semaphore-api-get
+      vars:
+        semaphore_api_endpoint: "task"
+        semaphore_api_query_params:
+          sort: "start"
+          order: "desc"
+
+    - name: Display query parameter test results
+      ansible.builtin.debug:
+        msg: "Query parameter test completed successfully"
+
+    - name: Test summary
+      ansible.builtin.debug:
+        msg:
+          - "=== Test Summary ==="
+          - "All API endpoints were successfully called"
+          - "Endpoints tested: inventory, task, variable_groups, repository, keys, templates, schedules"
+          - "Additional features tested: query parameters"
+          - "Check the output above for detailed results"

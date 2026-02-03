@@ -1,0 +1,11 @@
+---
+# tasks/schedules.yml - GET calls to schedules endpoint
+
+- name: Set schedules API URL
+  ansible.builtin.set_fact:
+    api_endpoint_url: "{{ semaphore_api_base_url }}/project/{{ semaphore_project_id }}/schedules{% if semaphore_resource_id != '' and semaphore_resource_id != None %}/{{ semaphore_resource_id }}{% endif %}"
+    api_endpoint_name: "schedules"
+    api_response_var: "semaphore_schedules_data"
+
+- name: Execute API call for schedules
+  ansible.builtin.include_tasks: common_api_call.yml

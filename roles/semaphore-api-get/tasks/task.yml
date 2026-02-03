@@ -1,0 +1,11 @@
+---
+# tasks/task.yml - GET calls to task endpoint
+
+- name: Set task API URL
+  ansible.builtin.set_fact:
+    api_endpoint_url: "{{ semaphore_api_base_url }}/project/{{ semaphore_project_id }}/tasks{% if semaphore_resource_id != '' and semaphore_resource_id != None %}/{{ semaphore_resource_id }}{% endif %}"
+    api_endpoint_name: "task"
+    api_response_var: "semaphore_task_data"
+
+- name: Execute API call for tasks
+  ansible.builtin.include_tasks: common_api_call.yml

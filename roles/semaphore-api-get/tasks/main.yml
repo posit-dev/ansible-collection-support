@@ -1,0 +1,68 @@
+---
+# tasks file for semaphore-api-get
+
+- name: Validate required variables
+  ansible.builtin.assert:
+    that:
+      - semaphore_api_endpoint is defined
+      - semaphore_api_endpoint != ""
+      - semaphore_api_endpoint in ['inventory', 'task', 'variable_groups', 'repository', 'keys', 'templates', 'schedules']
+      - semaphore_project_id is defined
+      - semaphore_api_base_url is defined
+    fail_msg: |
+      Required variables are not set or invalid.
+      - semaphore_api_endpoint must be one of: inventory, task, variable_groups, repository, keys, templates, schedules
+      - semaphore_project_id must be set
+      - semaphore_api_base_url must be set
+      Current values:
+        endpoint: {{ semaphore_api_endpoint | default('NOT SET') }}
+        project_id: {{ semaphore_project_id | default('NOT SET') }}
+        base_url: {{ semaphore_api_base_url | default('NOT SET') }}
+    success_msg: "All required variables are valid"
+
+- name: Validate authentication credentials
+  ansible.builtin.assert:
+    that:
+      - (semaphore_api_token is defined and semaphore_api_token != "") or (semaphore_api_user is defined and semaphore_api_password is defined)
+    fail_msg: "Either semaphore_api_token or both semaphore_api_user and semaphore_api_password must be provided"
+    success_msg: "Authentication credentials are provided"
+
+- name: Display API call information
+  ansible.builtin.debug:
+    msg:
+      - "=== Semaphore API GET Request ==="
+      - "Endpoint: {{ semaphore_api_endpoint }}"
+      - "Project ID: {{ semaphore_project_id }}"
+      - "Resource ID: {{ semaphore_resource_id | default('all', true) }}"
+      - "API Base URL: {{ semaphore_api_base_url }}"
+      - "Authentication: {% if semaphore_api_token != '' %}Token{% else %}Basic Auth{% endif %}"
+      - "Query Parameters: {{ semaphore_api_query_params | length }} parameter(s)"
+  when: semaphore_api_debug | bool
+
+- name: Call inventory endpoint
+  ansible.builtin.include_tasks: inventory.yml
+  when: semaphore_api_endpoint == 'inventory'
+
+- name: Call task endpoint
+  ansible.builtin.include_tasks: task.yml
+  when: semaphore_api_endpoint == 'task'
+
+- name: Call variable groups endpoint
+  ansible.builtin.include_tasks: variable_groups.yml
+  when: semaphore_api_endpoint == 'variable_groups'
+
+- name: Call repository endpoint
+  ansible.builtin.include_tasks: repository.yml
+  when: semaphore_api_endpoint == 'repository'
+
+- name: Call keys endpoint
+  ansible.builtin.include_tasks: keys.yml
+  when: semaphore_api_endpoint == 'keys'
+
+- name: Call templates endpoint
+  ansible.builtin.include_tasks: templates.yml
+  when: semaphore_api_endpoint == 'templates'
+
+- name: Call schedules endpoint
+  ansible.builtin.include_tasks: schedules.yml
+  when: semaphore_api_endpoint == 'schedules'
