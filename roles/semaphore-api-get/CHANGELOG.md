@@ -2,6 +2,48 @@
 
 All notable changes to the semaphore-api-get role will be documented in this file.
 
+## [4.0.0] - 2026-02-03
+
+### Added
+- **14 New API Endpoints** (total now 27):
+  - Global: `ping` (health check), `info` (system info), `user_tokens`, `events_last`
+  - Project: `project` (single project), `tasks_last`, `task_raw_output`, `backup`, `project_users`, `project_role`
+  - Integration: `integrations`, `integration`, `integration_matchers`, `integration_values`
+
+- **Comprehensive Input Validation**:
+  - URL format validation (must be valid HTTP/HTTPS)
+  - Project ID must be positive integer
+  - Resource ID validation for numeric values
+  - Authentication validation (token min 8 chars, not just "Bearer ")
+  - Numeric config bounds checking (retries 0-10, timeout 1-600s, delay 0-300s)
+  - Query parameters type validation (must be dict/mapping)
+
+- **Enhanced HTTP Status Codes**:
+  - Added: 406, 409, 410, 413, 415, 422, 501
+  - Total 18 status codes with human-readable messages
+
+- **Endpoint Categories**:
+  - Endpoints organized into: global, project, integration
+  - Category mapping in vars for filtering/documentation
+
+- **Improved Test Coverage**:
+  - 18 endpoint tests (was 7)
+  - Validation tests for invalid inputs
+  - Feature tests: query params, metadata, resource by ID
+  - Block/rescue pattern for graceful failure handling
+
+### Changed
+- **Validation in main.yml**: Moved resource_id validation from generic_endpoint.yml to main.yml
+- **Debug output**: Now shows endpoint description, token length, retry config
+- **Meta information**: Updated author, namespace, description, platforms (added Amazon, MacOSX, EL versions)
+- **Galaxy tags**: Added devops, rest, http, ansible_tower, awx
+
+### Technical Improvements
+- Configuration-driven endpoint categories for better organization
+- Stricter input validation prevents runtime errors
+- Test playbook uses block/rescue for comprehensive testing
+- All 27 endpoints documented with examples in defaults
+
 ## [3.0.0] - 2026-02-03
 
 ### Added

@@ -5,66 +5,175 @@
 # Endpoint configuration mapping
 # This defines the API path and response variable for each endpoint
 semaphore_endpoint_config:
+  # ===========================================
+  # Global endpoints (do not require project_id)
+  # ===========================================
+  ping:
+    path: "ping"
+    response_var: "semaphore_ping_data"
+    requires_project: false
+    description: "Health check endpoint"
+  info:
+    path: "info"
+    response_var: "semaphore_info_data"
+    requires_project: false
+    description: "System information and version"
+  projects:
+    path: "projects"
+    response_var: "semaphore_projects_data"
+    requires_project: false
+    description: "List all projects"
+  users:
+    path: "users"
+    response_var: "semaphore_users_data"
+    requires_project: false
+    description: "List all users (admin only)"
+  user:
+    path: "user"
+    response_var: "semaphore_current_user_data"
+    requires_project: false
+    description: "Current authenticated user info"
+  user_tokens:
+    path: "user/tokens"
+    response_var: "semaphore_user_tokens_data"
+    requires_project: false
+    description: "Current user's API tokens"
+  events_last:
+    path: "events/last"
+    response_var: "semaphore_events_last_data"
+    requires_project: false
+    description: "Last 200 global events (optimized)"
+
+  # ===========================================
   # Project-scoped endpoints (require project_id)
+  # ===========================================
+  project:
+    path: "project/{{ semaphore_project_id }}"
+    response_var: "semaphore_project_data"
+    requires_project: true
+    description: "Single project details"
   inventory:
     path: "project/{{ semaphore_project_id }}/inventory"
     response_var: "semaphore_inventory_data"
     requires_project: true
+    description: "Project inventories"
   task:
     path: "project/{{ semaphore_project_id }}/tasks"
     response_var: "semaphore_task_data"
     requires_project: true
-  variable_groups:
-    path: "project/{{ semaphore_project_id }}/environment"
-    response_var: "semaphore_variable_groups_data"
+    description: "Project tasks"
+  tasks_last:
+    path: "project/{{ semaphore_project_id }}/tasks/last"
+    response_var: "semaphore_tasks_last_data"
     requires_project: true
-  repository:
-    path: "project/{{ semaphore_project_id }}/repositories"
-    response_var: "semaphore_repository_data"
-    requires_project: true
-  keys:
-    path: "project/{{ semaphore_project_id }}/keys"
-    response_var: "semaphore_keys_data"
-    requires_project: true
-  templates:
-    path: "project/{{ semaphore_project_id }}/templates"
-    response_var: "semaphore_templates_data"
-    requires_project: true
-  schedules:
-    path: "project/{{ semaphore_project_id }}/schedules"
-    response_var: "semaphore_schedules_data"
-    requires_project: true
-  events:
-    path: "project/{{ semaphore_project_id }}/events"
-    response_var: "semaphore_events_data"
-    requires_project: true
-  views:
-    path: "project/{{ semaphore_project_id }}/views"
-    response_var: "semaphore_views_data"
-    requires_project: true
+    description: "Last 200 tasks (optimized)"
   task_output:
     path: "project/{{ semaphore_project_id }}/tasks/{{ semaphore_resource_id }}/output"
     response_var: "semaphore_task_output_data"
     requires_project: true
     requires_resource: true
-  # Global endpoints (do not require project_id)
-  projects:
-    path: "projects"
-    response_var: "semaphore_projects_data"
-    requires_project: false
-  users:
-    path: "users"
-    response_var: "semaphore_users_data"
-    requires_project: false
-  user:
-    path: "user"
-    response_var: "semaphore_current_user_data"
-    requires_project: false
+    description: "Task output (structured JSON)"
+  task_raw_output:
+    path: "project/{{ semaphore_project_id }}/tasks/{{ semaphore_resource_id }}/raw_output"
+    response_var: "semaphore_task_raw_output_data"
+    requires_project: true
+    requires_resource: true
+    description: "Task output (plain text)"
+  variable_groups:
+    path: "project/{{ semaphore_project_id }}/environment"
+    response_var: "semaphore_variable_groups_data"
+    requires_project: true
+    description: "Environment variable groups"
+  repository:
+    path: "project/{{ semaphore_project_id }}/repositories"
+    response_var: "semaphore_repository_data"
+    requires_project: true
+    description: "Project repositories"
+  keys:
+    path: "project/{{ semaphore_project_id }}/keys"
+    response_var: "semaphore_keys_data"
+    requires_project: true
+    description: "SSH/access keys"
+  templates:
+    path: "project/{{ semaphore_project_id }}/templates"
+    response_var: "semaphore_templates_data"
+    requires_project: true
+    description: "Task templates"
+  schedules:
+    path: "project/{{ semaphore_project_id }}/schedules"
+    response_var: "semaphore_schedules_data"
+    requires_project: true
+    description: "Scheduled tasks"
+  events:
+    path: "project/{{ semaphore_project_id }}/events"
+    response_var: "semaphore_events_data"
+    requires_project: true
+    description: "Project activity log"
+  views:
+    path: "project/{{ semaphore_project_id }}/views"
+    response_var: "semaphore_views_data"
+    requires_project: true
+    description: "Template views/groups"
+  backup:
+    path: "project/{{ semaphore_project_id }}/backup"
+    response_var: "semaphore_backup_data"
+    requires_project: true
+    description: "Project backup/export"
+  project_users:
+    path: "project/{{ semaphore_project_id }}/users"
+    response_var: "semaphore_project_users_data"
+    requires_project: true
+    description: "Project user assignments"
+  project_role:
+    path: "project/{{ semaphore_project_id }}/role"
+    response_var: "semaphore_project_role_data"
+    requires_project: true
+    description: "Current user's role in project"
+
+  # ===========================================
+  # Integration endpoints (require project_id)
+  # ===========================================
+  integrations:
+    path: "project/{{ semaphore_project_id }}/integrations"
+    response_var: "semaphore_integrations_data"
+    requires_project: true
+    description: "Project integrations"
+  integration:
+    path: "project/{{ semaphore_project_id }}/integrations/{{ semaphore_resource_id }}"
+    response_var: "semaphore_integration_data"
+    requires_project: true
+    requires_resource: true
+    description: "Single integration details"
+  integration_matchers:
+    path: "project/{{ semaphore_project_id }}/integrations/{{ semaphore_resource_id }}/matchers"
+    response_var: "semaphore_integration_matchers_data"
+    requires_project: true
+    requires_resource: true
+    description: "Integration matchers"
+  integration_values:
+    path: "project/{{ semaphore_project_id }}/integrations/{{ semaphore_resource_id }}/values"
+    response_var: "semaphore_integration_values_data"
+    requires_project: true
+    requires_resource: true
+    description: "Extracted integration values"
 
 # List of all valid endpoints for validation
 semaphore_valid_endpoints:
+  # Global endpoints
+  - ping
+  - info
+  - projects
+  - users
+  - user
+  - user_tokens
+  - events_last
+  # Project endpoints
+  - project
   - inventory
   - task
+  - tasks_last
+  - task_output
+  - task_raw_output
   - variable_groups
   - repository
   - keys
@@ -72,21 +181,67 @@ semaphore_valid_endpoints:
   - schedules
   - events
   - views
-  - task_output
-  - projects
-  - users
-  - user
+  - backup
+  - project_users
+  - project_role
+  # Integration endpoints
+  - integrations
+  - integration
+  - integration_matchers
+  - integration_values
 
 # HTTP status code messages for better error reporting
 semaphore_http_status_messages:
+  # 4xx Client Errors
   400: "Bad Request - The request was malformed or contains invalid parameters"
   401: "Unauthorized - Invalid or missing authentication credentials"
   403: "Forbidden - You don't have permission to access this resource"
   404: "Not Found - The requested resource does not exist"
   405: "Method Not Allowed - GET method not supported for this endpoint"
+  406: "Not Acceptable - The requested format is not available"
   408: "Request Timeout - The server took too long to respond"
+  409: "Conflict - The request conflicts with the current state of the resource"
+  410: "Gone - The requested resource has been permanently removed"
+  413: "Payload Too Large - The request body exceeds the maximum allowed size"
+  415: "Unsupported Media Type - The request content type is not supported"
+  422: "Unprocessable Entity - The request was well-formed but contains semantic errors"
   429: "Too Many Requests - Rate limit exceeded, please wait before retrying"
+  # 5xx Server Errors
   500: "Internal Server Error - The server encountered an unexpected error"
+  501: "Not Implemented - The requested functionality is not implemented"
   502: "Bad Gateway - The server received an invalid response from upstream"
   503: "Service Unavailable - The server is temporarily unavailable"
   504: "Gateway Timeout - The upstream server failed to respond in time"
+
+# Endpoint categories for documentation and filtering
+semaphore_endpoint_categories:
+  global:
+    - ping
+    - info
+    - projects
+    - users
+    - user
+    - user_tokens
+    - events_last
+  project:
+    - project
+    - inventory
+    - task
+    - tasks_last
+    - task_output
+    - task_raw_output
+    - variable_groups
+    - repository
+    - keys
+    - templates
+    - schedules
+    - events
+    - views
+    - backup
+    - project_users
+    - project_role
+  integration:
+    - integrations
+    - integration
+    - integration_matchers
+    - integration_values

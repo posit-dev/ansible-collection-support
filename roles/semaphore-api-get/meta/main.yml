@@ -1,8 +1,13 @@
 ---
 galaxy_info:
-  author: Your Name
-  description: Ansible role for making GET requests to Semaphore UI API endpoints
-  company: Your Company
+  author: Heath Provost
+  namespace: support
+  description: >-
+    Ansible role for making GET requests to Semaphore UI API endpoints.
+    Supports 27 endpoints including inventory, tasks, templates, schedules,
+    integrations, and more. Features include automatic retries, comprehensive
+    error handling, query parameters, and response metadata.
+  company: ""
 
   license: MIT
 
@@ -20,6 +25,14 @@ galaxy_info:
         - all
     - name: EL
       versions:
+        - "7"
+        - "8"
+        - "9"
+    - name: Amazon
+      versions:
+        - all
+    - name: MacOSX
+      versions:
         - all
 
   galaxy_tags:
@@ -28,5 +41,10 @@ galaxy_info:
     - automation
     - ci
     - cd
+    - devops
+    - rest
+    - http
+    - ansible_tower
+    - awx
 
 dependencies: []

@@ -1,26 +1,19 @@
 ---
 # tasks/generic_endpoint.yml - Generic endpoint handler using configuration mapping
 # This task file uses the endpoint configuration from vars/main.yml
+# Note: Input validation is performed in main.yml before this file is included
 
 - name: Get endpoint configuration
   ansible.builtin.set_fact:
     _endpoint_config: "{{ semaphore_endpoint_config[semaphore_api_endpoint] }}"
 
-- name: Validate resource_id for endpoints that require it
-  ansible.builtin.assert:
-    that:
-      - semaphore_resource_id is defined
-      - semaphore_resource_id != ""
-      - semaphore_resource_id != None
-    fail_msg: "The '{{ semaphore_api_endpoint }}' endpoint requires semaphore_resource_id to be set"
-    success_msg: "Resource ID validation passed"
-  when: _endpoint_config.requires_resource | default(false)
-
-- name: Build API endpoint URL (with resource ID)
+- name: Build API endpoint URL
   ansible.builtin.set_fact:
-    api_endpoint_url: "{{ semaphore_api_base_url }}/{{ _endpoint_config.path }}{% if semaphore_resource_id != '' and semaphore_resource_id != None and not (_endpoint_config.requires_resource | default(false)) %}/{{ semaphore_resource_id }}{% endif %}"
+    api_endpoint_url: >-
+      {{ semaphore_api_base_url }}/{{ _endpoint_config.path }}{% if semaphore_resource_id | default('') != '' and semaphore_resource_id != None and not (_endpoint_config.requires_resource | default(false)) %}/{{ semaphore_resource_id }}{% endif %}
     api_endpoint_name: "{{ semaphore_api_endpoint }}"
     api_response_var: "{{ _endpoint_config.response_var }}"
+    api_endpoint_description: "{{ _endpoint_config.description | default('') }}"
 
 - name: Execute API call
   ansible.builtin.include_tasks: common_api_call.yml

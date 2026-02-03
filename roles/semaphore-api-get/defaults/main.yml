@@ -5,19 +5,25 @@
 semaphore_api_base_url: "{{ semaphore_ui_api | default('http://localhost:3000/api') }}"
 
 # API authentication
+# Token authentication is preferred; basic auth used as fallback
 semaphore_api_token: ""
 semaphore_api_user: "admin"
 semaphore_api_password: "changeme"
 
-# Endpoint to call
-# Project-scoped endpoints: inventory, task, variable_groups, repository, keys, templates, schedules, events, views, task_output
-# Global endpoints: projects, users, user
+# Endpoint to call (27 endpoints available)
+# Global endpoints: ping, info, projects, users, user, user_tokens, events_last
+# Project endpoints: project, inventory, task, tasks_last, task_output, task_raw_output,
+#                    variable_groups, repository, keys, templates, schedules, events,
+#                    views, backup, project_users, project_role
+# Integration endpoints: integrations, integration, integration_matchers, integration_values
 semaphore_api_endpoint: ""
 
 # Project ID for API calls (required for project-scoped endpoints)
 semaphore_project_id: 1
 
-# Resource ID for specific resource lookups (optional for most endpoints, required for task_output)
+# Resource ID for specific resource lookups
+# Optional for most endpoints, required for: task_output, task_raw_output,
+# integration, integration_matchers, integration_values
 semaphore_resource_id: ""
 
 # Additional query parameters (optional)
@@ -25,6 +31,7 @@ semaphore_resource_id: ""
 semaphore_api_query_params: {}
 
 # Retry settings for API calls
+# Retries: 0-10, Delay: 0-300 seconds
 semaphore_api_retries: 3
 semaphore_api_retry_delay: 5
 
@@ -34,7 +41,7 @@ semaphore_api_verbose_debug: false
 
 # HTTP request settings
 semaphore_api_validate_certs: true
-semaphore_api_timeout: 30
+semaphore_api_timeout: 30  # 1-600 seconds
 semaphore_api_follow_redirects: "all"
 
 # Response handling
@@ -44,87 +51,152 @@ semaphore_api_expected_status_codes: [200]
 semaphore_api_validate_json: true
 semaphore_api_store_metadata: true
 
-# Example configurations for each endpoint type
-# These show the typical structure for each endpoint
-
-# Project-scoped endpoints (require project_id)
+# ==============================================
+# Endpoint Examples
 # ==============================================
 
-# Example: Get all inventories for a project
+# Global endpoints (do not require project_id)
+# ---------------------------------------------
+
+# Health check - verify API is responding
+# Returns: { "message": "pong" }
+semaphore_api_ping_example:
+  endpoint: "ping"
+
+# System information - version, features
+# Returns: { "version": "2.x.x", ... }
+semaphore_api_info_example:
+  endpoint: "info"
+
+# List all projects
+semaphore_api_projects_example:
+  endpoint: "projects"
+
+# Current authenticated user
+semaphore_api_user_example:
+  endpoint: "user"
+
+# Current user's API tokens
+semaphore_api_user_tokens_example:
+  endpoint: "user_tokens"
+
+# All users (admin only)
+semaphore_api_users_example:
+  endpoint: "users"
+
+# Last 200 global events (optimized)
+semaphore_api_events_last_example:
+  endpoint: "events_last"
+
+# Project-scoped endpoints (require project_id)
+# ---------------------------------------------
+
+# Single project details
+semaphore_api_project_example:
+  endpoint: "project"
+  project_id: 1
+
+# All inventories for a project
 semaphore_api_inventory_example:
   endpoint: "inventory"
   project_id: 1
-  resource_id: ""  # Leave empty to get all inventories, or specify ID for specific inventory
+  resource_id: ""  # Optional: specific inventory ID
 
-# Example: Get all tasks for a project
+# All tasks for a project
 semaphore_api_task_example:
   endpoint: "task"
   project_id: 1
-  resource_id: ""  # Leave empty to get all tasks, or specify task ID for specific task
+  resource_id: ""  # Optional: specific task ID
 
-# Example: Get all variable groups (environment variables)
-semaphore_api_variable_groups_example:
-  endpoint: "variable_groups"
+# Last 200 tasks (optimized)
+semaphore_api_tasks_last_example:
+  endpoint: "tasks_last"
   project_id: 1
-  resource_id: ""  # Leave empty to get all variable groups, or specify ID for specific group
 
-# Example: Get all repositories for a project
-semaphore_api_repository_example:
-  endpoint: "repository"
-  project_id: 1
-  resource_id: ""  # Leave empty to get all repositories, or specify ID for specific repository
-
-# Example: Get all access keys for a project
-semaphore_api_keys_example:
-  endpoint: "keys"
-  project_id: 1
-  resource_id: ""  # Leave empty to get all keys, or specify ID for specific key
-
-# Example: Get all templates for a project
-semaphore_api_templates_example:
-  endpoint: "templates"
-  project_id: 1
-  resource_id: ""  # Leave empty to get all templates, or specify ID for specific template
-
-# Example: Get all schedules for a project
-semaphore_api_schedules_example:
-  endpoint: "schedules"
-  project_id: 1
-  resource_id: ""  # Leave empty to get all schedules, or specify ID for specific schedule
-
-# Example: Get all events/activity log for a project
-semaphore_api_events_example:
-  endpoint: "events"
-  project_id: 1
-  resource_id: ""  # Leave empty to get all events
-
-# Example: Get all views for a project
-semaphore_api_views_example:
-  endpoint: "views"
-  project_id: 1
-  resource_id: ""  # Leave empty to get all views, or specify ID for specific view
-
-# Example: Get output for a specific task (requires resource_id)
+# Task output (structured JSON)
 semaphore_api_task_output_example:
   endpoint: "task_output"
   project_id: 1
-  resource_id: "42"  # Required - the task ID to get output for
+  resource_id: "42"  # Required: task ID
 
-# Global endpoints (do not require project_id)
-# =============================================
+# Task output (plain text)
+semaphore_api_task_raw_output_example:
+  endpoint: "task_raw_output"
+  project_id: 1
+  resource_id: "42"  # Required: task ID
 
-# Example: Get all projects
-semaphore_api_projects_example:
-  endpoint: "projects"
-  # project_id not required
-  resource_id: ""  # Leave empty to get all projects, or specify ID for specific project
+# Environment variable groups
+semaphore_api_variable_groups_example:
+  endpoint: "variable_groups"
+  project_id: 1
 
-# Example: Get all users (admin only)
-semaphore_api_users_example:
-  endpoint: "users"
-  # project_id not required
+# Repositories
+semaphore_api_repository_example:
+  endpoint: "repository"
+  project_id: 1
 
-# Example: Get current authenticated user info
-semaphore_api_user_example:
-  endpoint: "user"
-  # project_id not required
+# SSH/access keys
+semaphore_api_keys_example:
+  endpoint: "keys"
+  project_id: 1
+
+# Task templates
+semaphore_api_templates_example:
+  endpoint: "templates"
+  project_id: 1
+
+# Scheduled tasks
+semaphore_api_schedules_example:
+  endpoint: "schedules"
+  project_id: 1
+
+# Project activity/events log
+semaphore_api_events_example:
+  endpoint: "events"
+  project_id: 1
+
+# Template views/groups
+semaphore_api_views_example:
+  endpoint: "views"
+  project_id: 1
+
+# Project backup/export
+semaphore_api_backup_example:
+  endpoint: "backup"
+  project_id: 1
+
+# Project user assignments
+semaphore_api_project_users_example:
+  endpoint: "project_users"
+  project_id: 1
+
+# Current user's role in project
+semaphore_api_project_role_example:
+  endpoint: "project_role"
+  project_id: 1
+
+# Integration endpoints (require project_id)
+# ------------------------------------------
+
+# All integrations for a project
+semaphore_api_integrations_example:
+  endpoint: "integrations"
+  project_id: 1
+
+# Single integration details
+semaphore_api_integration_example:
+  endpoint: "integration"
+  project_id: 1
+  resource_id: "1"  # Required: integration ID
+
+# Integration matchers
+semaphore_api_integration_matchers_example:
+  endpoint: "integration_matchers"
+  project_id: 1
+  resource_id: "1"  # Required: integration ID
+
+# Extracted integration values
+semaphore_api_integration_values_example:
+  endpoint: "integration_values"
+  project_id: 1
+  resource_id: "1"  # Required: integration ID

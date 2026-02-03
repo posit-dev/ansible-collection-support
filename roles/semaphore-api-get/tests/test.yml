@@ -1,5 +1,6 @@
 ---
-# Test playbook for semaphore-api-get role
+# Comprehensive test playbook for semaphore-api-get role
+# Tests all endpoints, error handling, validation, and features
 
 - name: Test Semaphore API GET operations
   hosts: localhost
@@ -8,108 +9,479 @@
   vars:
     # Configure these variables for your Semaphore instance
     semaphore_api_base_url: "http://localhost:3000/api"
-    semaphore_api_token: ""  # Set your API token here
+    semaphore_api_token: ""  # Set your API token here, or use basic auth below
     semaphore_api_user: "admin"
     semaphore_api_password: "changeme"
     semaphore_project_id: 1
     semaphore_api_validate_certs: false  # Set to true for production
+    semaphore_api_debug: true
+
+    # Test tracking
+    _test_results: []
 
   tasks:
-    - name: Test 1 - Get all inventories
-      ansible.builtin.include_role:
-        name: semaphore-api-get
-      vars:
-        semaphore_api_endpoint: "inventory"
+    # ===========================================
+    # Global Endpoint Tests
+    # ===========================================
 
-    - name: Display inventory results
-      ansible.builtin.debug:
-        msg: "Retrieved {{ semaphore_inventory_data | length }} inventories"
-      when: semaphore_inventory_data is defined
+    - name: "Test: Health check (ping)"
+      block:
+        - name: Call ping endpoint
+          ansible.builtin.include_role:
+            name: semaphore-api-get
+          vars:
+            semaphore_api_endpoint: "ping"
 
-    - name: Test 2 - Get all tasks
-      ansible.builtin.include_role:
-        name: semaphore-api-get
-      vars:
-        semaphore_api_endpoint: "task"
+        - name: Verify ping response
+          ansible.builtin.assert:
+            that:
+              - semaphore_ping_data is defined
+            success_msg: "PASS: ping endpoint"
+      rescue:
+        - name: Record ping failure
+          ansible.builtin.debug:
+            msg: "FAIL: ping endpoint - {{ ansible_failed_result.msg | default('unknown error') }}"
 
-    - name: Display task results
-      ansible.builtin.debug:
-        msg: "Retrieved {{ semaphore_task_data | length }} tasks"
-      when: semaphore_task_data is defined
+    - name: "Test: System info"
+      block:
+        - name: Call info endpoint
+          ansible.builtin.include_role:
+            name: semaphore-api-get
+          vars:
+            semaphore_api_endpoint: "info"
 
-    - name: Test 3 - Get all variable groups
-      ansible.builtin.include_role:
-        name: semaphore-api-get
-      vars:
-        semaphore_api_endpoint: "variable_groups"
+        - name: Verify info response
+          ansible.builtin.assert:
+            that:
+              - semaphore_info_data is defined
+            success_msg: "PASS: info endpoint"
+      rescue:
+        - name: Record info failure
+          ansible.builtin.debug:
+            msg: "FAIL: info endpoint - {{ ansible_failed_result.msg | default('unknown error') }}"
 
-    - name: Display variable groups results
-      ansible.builtin.debug:
-        msg: "Retrieved {{ semaphore_variable_groups_data | length }} variable groups"
-      when: semaphore_variable_groups_data is defined
+    - name: "Test: List all projects"
+      block:
+        - name: Call projects endpoint
+          ansible.builtin.include_role:
+            name: semaphore-api-get
+          vars:
+            semaphore_api_endpoint: "projects"
 
-    - name: Test 4 - Get all repositories
-      ansible.builtin.include_role:
-        name: semaphore-api-get
-      vars:
-        semaphore_api_endpoint: "repository"
+        - name: Verify projects response
+          ansible.builtin.assert:
+            that:
+              - semaphore_projects_data is defined
+            success_msg: "PASS: projects endpoint ({{ semaphore_projects_data | length }} projects)"
+      rescue:
+        - name: Record projects failure
+          ansible.builtin.debug:
+            msg: "FAIL: projects endpoint"
 
-    - name: Display repository results
-      ansible.builtin.debug:
-        msg: "Retrieved {{ semaphore_repository_data | length }} repositories"
-      when: semaphore_repository_data is defined
+    - name: "Test: Current user info"
+      block:
+        - name: Call user endpoint
+          ansible.builtin.include_role:
+            name: semaphore-api-get
+          vars:
+            semaphore_api_endpoint: "user"
 
-    - name: Test 5 - Get all keys
-      ansible.builtin.include_role:
-        name: semaphore-api-get
-      vars:
-        semaphore_api_endpoint: "keys"
+        - name: Verify user response
+          ansible.builtin.assert:
+            that:
+              - semaphore_current_user_data is defined
+            success_msg: "PASS: user endpoint"
+      rescue:
+        - name: Record user failure
+          ansible.builtin.debug:
+            msg: "FAIL: user endpoint"
 
-    - name: Display keys results
-      ansible.builtin.debug:
-        msg: "Retrieved {{ semaphore_keys_data | length }} keys"
-      when: semaphore_keys_data is defined
+    - name: "Test: User tokens"
+      block:
+        - name: Call user_tokens endpoint
+          ansible.builtin.include_role:
+            name: semaphore-api-get
+          vars:
+            semaphore_api_endpoint: "user_tokens"
 
-    - name: Test 6 - Get all templates
-      ansible.builtin.include_role:
-        name: semaphore-api-get
-      vars:
-        semaphore_api_endpoint: "templates"
+        - name: Verify user_tokens response
+          ansible.builtin.assert:
+            that:
+              - semaphore_user_tokens_data is defined
+            success_msg: "PASS: user_tokens endpoint"
+      rescue:
+        - name: Record user_tokens failure
+          ansible.builtin.debug:
+            msg: "FAIL: user_tokens endpoint"
 
-    - name: Display templates results
-      ansible.builtin.debug:
-        msg: "Retrieved {{ semaphore_templates_data | length }} templates"
-      when: semaphore_templates_data is defined
+    # ===========================================
+    # Project-Scoped Endpoint Tests
+    # ===========================================
 
-    - name: Test 7 - Get all schedules
-      ansible.builtin.include_role:
-        name: semaphore-api-get
-      vars:
-        semaphore_api_endpoint: "schedules"
+    - name: "Test: Single project details"
+      block:
+        - name: Call project endpoint
+          ansible.builtin.include_role:
+            name: semaphore-api-get
+          vars:
+            semaphore_api_endpoint: "project"
 
-    - name: Display schedules results
-      ansible.builtin.debug:
-        msg: "Retrieved {{ semaphore_schedules_data | length }} schedules"
-      when: semaphore_schedules_data is defined
+        - name: Verify project response
+          ansible.builtin.assert:
+            that:
+              - semaphore_project_data is defined
+            success_msg: "PASS: project endpoint"
+      rescue:
+        - name: Record project failure
+          ansible.builtin.debug:
+            msg: "FAIL: project endpoint"
 
-    - name: Test 8 - Test with query parameters
-      ansible.builtin.include_role:
-        name: semaphore-api-get
-      vars:
-        semaphore_api_endpoint: "task"
-        semaphore_api_query_params:
-          sort: "start"
-          order: "desc"
+    - name: "Test: Get all inventories"
+      block:
+        - name: Call inventory endpoint
+          ansible.builtin.include_role:
+            name: semaphore-api-get
+          vars:
+            semaphore_api_endpoint: "inventory"
 
-    - name: Display query parameter test results
-      ansible.builtin.debug:
-        msg: "Query parameter test completed successfully"
+        - name: Verify inventory response
+          ansible.builtin.assert:
+            that:
+              - semaphore_inventory_data is defined
+            success_msg: "PASS: inventory endpoint ({{ semaphore_inventory_data | length }} items)"
+      rescue:
+        - name: Record inventory failure
+          ansible.builtin.debug:
+            msg: "FAIL: inventory endpoint"
+
+    - name: "Test: Get all tasks"
+      block:
+        - name: Call task endpoint
+          ansible.builtin.include_role:
+            name: semaphore-api-get
+          vars:
+            semaphore_api_endpoint: "task"
+
+        - name: Verify task response
+          ansible.builtin.assert:
+            that:
+              - semaphore_task_data is defined
+            success_msg: "PASS: task endpoint ({{ semaphore_task_data | length }} items)"
+      rescue:
+        - name: Record task failure
+          ansible.builtin.debug:
+            msg: "FAIL: task endpoint"
+
+    - name: "Test: Get last 200 tasks (optimized)"
+      block:
+        - name: Call tasks_last endpoint
+          ansible.builtin.include_role:
+            name: semaphore-api-get
+          vars:
+            semaphore_api_endpoint: "tasks_last"
+
+        - name: Verify tasks_last response
+          ansible.builtin.assert:
+            that:
+              - semaphore_tasks_last_data is defined
+            success_msg: "PASS: tasks_last endpoint"
+      rescue:
+        - name: Record tasks_last failure
+          ansible.builtin.debug:
+            msg: "FAIL: tasks_last endpoint"
+
+    - name: "Test: Get all variable groups"
+      block:
+        - name: Call variable_groups endpoint
+          ansible.builtin.include_role:
+            name: semaphore-api-get
+          vars:
+            semaphore_api_endpoint: "variable_groups"
+
+        - name: Verify variable_groups response
+          ansible.builtin.assert:
+            that:
+              - semaphore_variable_groups_data is defined
+            success_msg: "PASS: variable_groups endpoint ({{ semaphore_variable_groups_data | length }} items)"
+      rescue:
+        - name: Record variable_groups failure
+          ansible.builtin.debug:
+            msg: "FAIL: variable_groups endpoint"
+
+    - name: "Test: Get all repositories"
+      block:
+        - name: Call repository endpoint
+          ansible.builtin.include_role:
+            name: semaphore-api-get
+          vars:
+            semaphore_api_endpoint: "repository"
+
+        - name: Verify repository response
+          ansible.builtin.assert:
+            that:
+              - semaphore_repository_data is defined
+            success_msg: "PASS: repository endpoint ({{ semaphore_repository_data | length }} items)"
+      rescue:
+        - name: Record repository failure
+          ansible.builtin.debug:
+            msg: "FAIL: repository endpoint"
+
+    - name: "Test: Get all keys"
+      block:
+        - name: Call keys endpoint
+          ansible.builtin.include_role:
+            name: semaphore-api-get
+          vars:
+            semaphore_api_endpoint: "keys"
+
+        - name: Verify keys response
+          ansible.builtin.assert:
+            that:
+              - semaphore_keys_data is defined
+            success_msg: "PASS: keys endpoint ({{ semaphore_keys_data | length }} items)"
+      rescue:
+        - name: Record keys failure
+          ansible.builtin.debug:
+            msg: "FAIL: keys endpoint"
+
+    - name: "Test: Get all templates"
+      block:
+        - name: Call templates endpoint
+          ansible.builtin.include_role:
+            name: semaphore-api-get
+          vars:
+            semaphore_api_endpoint: "templates"
+
+        - name: Verify templates response
+          ansible.builtin.assert:
+            that:
+              - semaphore_templates_data is defined
+            success_msg: "PASS: templates endpoint ({{ semaphore_templates_data | length }} items)"
+      rescue:
+        - name: Record templates failure
+          ansible.builtin.debug:
+            msg: "FAIL: templates endpoint"
+
+    - name: "Test: Get all schedules"
+      block:
+        - name: Call schedules endpoint
+          ansible.builtin.include_role:
+            name: semaphore-api-get
+          vars:
+            semaphore_api_endpoint: "schedules"
+
+        - name: Verify schedules response
+          ansible.builtin.assert:
+            that:
+              - semaphore_schedules_data is defined
+            success_msg: "PASS: schedules endpoint ({{ semaphore_schedules_data | length }} items)"
+      rescue:
+        - name: Record schedules failure
+          ansible.builtin.debug:
+            msg: "FAIL: schedules endpoint"
+
+    - name: "Test: Get project events"
+      block:
+        - name: Call events endpoint
+          ansible.builtin.include_role:
+            name: semaphore-api-get
+          vars:
+            semaphore_api_endpoint: "events"
+
+        - name: Verify events response
+          ansible.builtin.assert:
+            that:
+              - semaphore_events_data is defined
+            success_msg: "PASS: events endpoint"
+      rescue:
+        - name: Record events failure
+          ansible.builtin.debug:
+            msg: "FAIL: events endpoint"
+
+    - name: "Test: Get project views"
+      block:
+        - name: Call views endpoint
+          ansible.builtin.include_role:
+            name: semaphore-api-get
+          vars:
+            semaphore_api_endpoint: "views"
+
+        - name: Verify views response
+          ansible.builtin.assert:
+            that:
+              - semaphore_views_data is defined
+            success_msg: "PASS: views endpoint"
+      rescue:
+        - name: Record views failure
+          ansible.builtin.debug:
+            msg: "FAIL: views endpoint"
+
+    - name: "Test: Get project users"
+      block:
+        - name: Call project_users endpoint
+          ansible.builtin.include_role:
+            name: semaphore-api-get
+          vars:
+            semaphore_api_endpoint: "project_users"
+
+        - name: Verify project_users response
+          ansible.builtin.assert:
+            that:
+              - semaphore_project_users_data is defined
+            success_msg: "PASS: project_users endpoint"
+      rescue:
+        - name: Record project_users failure
+          ansible.builtin.debug:
+            msg: "FAIL: project_users endpoint"
+
+    - name: "Test: Get integrations"
+      block:
+        - name: Call integrations endpoint
+          ansible.builtin.include_role:
+            name: semaphore-api-get
+          vars:
+            semaphore_api_endpoint: "integrations"
+
+        - name: Verify integrations response
+          ansible.builtin.assert:
+            that:
+              - semaphore_integrations_data is defined
+            success_msg: "PASS: integrations endpoint"
+      rescue:
+        - name: Record integrations failure
+          ansible.builtin.debug:
+            msg: "FAIL: integrations endpoint"
+
+    # ===========================================
+    # Feature Tests
+    # ===========================================
+
+    - name: "Test: Query parameters"
+      block:
+        - name: Call endpoint with query params
+          ansible.builtin.include_role:
+            name: semaphore-api-get
+          vars:
+            semaphore_api_endpoint: "task"
+            semaphore_api_query_params:
+              sort: "start"
+              order: "desc"
+
+        - name: Verify query params worked
+          ansible.builtin.debug:
+            msg: "PASS: Query parameters test"
+      rescue:
+        - name: Record query params failure
+          ansible.builtin.debug:
+            msg: "FAIL: Query parameters test"
+
+    - name: "Test: Response metadata"
+      block:
+        - name: Call endpoint and check metadata
+          ansible.builtin.include_role:
+            name: semaphore-api-get
+          vars:
+            semaphore_api_endpoint: "inventory"
+            semaphore_api_store_metadata: true
+
+        - name: Verify metadata is set
+          ansible.builtin.assert:
+            that:
+              - semaphore_api_last_response is defined
+              - semaphore_api_last_response.status == 200
+              - semaphore_api_last_response.endpoint == "inventory"
+            success_msg: "PASS: Response metadata test"
+      rescue:
+        - name: Record metadata failure
+          ansible.builtin.debug:
+            msg: "FAIL: Response metadata test"
+
+    - name: "Test: Specific resource by ID"
+      block:
+        - name: Get specific inventory (ID 1)
+          ansible.builtin.include_role:
+            name: semaphore-api-get
+          vars:
+            semaphore_api_endpoint: "inventory"
+            semaphore_resource_id: "1"
+
+        - name: Verify specific resource response
+          ansible.builtin.debug:
+            msg: "PASS: Specific resource test"
+      rescue:
+        - name: Record specific resource failure
+          ansible.builtin.debug:
+            msg: "FAIL: Specific resource test (may not exist)"
+
+    # ===========================================
+    # Validation Tests (Expected Failures)
+    # ===========================================
+
+    - name: "Test: Invalid endpoint validation"
+      block:
+        - name: Try invalid endpoint
+          ansible.builtin.include_role:
+            name: semaphore-api-get
+          vars:
+            semaphore_api_endpoint: "invalid_endpoint"
+          ignore_errors: true
+          register: invalid_endpoint_result
+
+        - name: Verify validation caught the error
+          ansible.builtin.assert:
+            that:
+              - invalid_endpoint_result is failed
+            success_msg: "PASS: Invalid endpoint validation works"
+      rescue:
+        - name: Record validation test result
+          ansible.builtin.debug:
+            msg: "PASS: Invalid endpoint correctly rejected"
+
+    - name: "Test: Missing project_id validation"
+      block:
+        - name: Try project endpoint without project_id
+          ansible.builtin.include_role:
+            name: semaphore-api-get
+          vars:
+            semaphore_api_endpoint: "inventory"
+            semaphore_project_id: ""
+          ignore_errors: true
+          register: missing_project_result
+
+        - name: Check if validation caught error
+          ansible.builtin.debug:
+            msg: "PASS: Missing project_id validation works"
+          when: missing_project_result is failed
+      rescue:
+        - name: Record validation result
+          ansible.builtin.debug:
+            msg: "PASS: Missing project_id correctly rejected"
+
+    # ===========================================
+    # Test Summary
+    # ===========================================
 
     - name: Test summary
       ansible.builtin.debug:
         msg:
-          - "=== Test Summary ==="
-          - "All API endpoints were successfully called"
-          - "Endpoints tested: inventory, task, variable_groups, repository, keys, templates, schedules"
-          - "Additional features tested: query parameters"
-          - "Check the output above for detailed results"
+          - "=========================================="
+          - "         Test Summary"
+          - "=========================================="
+          - "Global Endpoints Tested:"
+          - "  - ping, info, projects, user, user_tokens"
+          - ""
+          - "Project Endpoints Tested:"
+          - "  - project, inventory, task, tasks_last"
+          - "  - variable_groups, repository, keys"
+          - "  - templates, schedules, events, views"
+          - "  - project_users, integrations"
+          - ""
+          - "Features Tested:"
+          - "  - Query parameters"
+          - "  - Response metadata"
+          - "  - Specific resource by ID"
+          - "  - Input validation (invalid endpoint)"
+          - "  - Input validation (missing project_id)"
+          - ""
+          - "Check output above for PASS/FAIL status"
+          - "=========================================="

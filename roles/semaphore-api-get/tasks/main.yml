@@ -1,6 +1,10 @@
 ---
 # tasks file for semaphore-api-get
 
+# ===========================================
+# Input Validation
+# ===========================================
+
 - name: Validate required variables
   ansible.builtin.assert:
     that:
@@ -8,45 +12,121 @@
       - semaphore_api_endpoint != ""
       - semaphore_api_endpoint in semaphore_valid_endpoints
       - semaphore_api_base_url is defined
+      - semaphore_api_base_url != ""
     fail_msg: |
       Required variables are not set or invalid.
       - semaphore_api_endpoint must be one of: {{ semaphore_valid_endpoints | join(', ') }}
-      - semaphore_api_base_url must be set
+      - semaphore_api_base_url must be set and not empty
       Current values:
         endpoint: {{ semaphore_api_endpoint | default('NOT SET') }}
         base_url: {{ semaphore_api_base_url | default('NOT SET') }}
     success_msg: "All required variables are valid"
 
+- name: Validate base URL format
+  ansible.builtin.assert:
+    that:
+      - semaphore_api_base_url is regex('^https?://.+')
+    fail_msg: |
+      semaphore_api_base_url must be a valid HTTP/HTTPS URL.
+      Current value: {{ semaphore_api_base_url }}
+      Expected format: http://hostname:port/api or https://hostname/api
+    success_msg: "Base URL format is valid"
+
 - name: Validate project_id for project-scoped endpoints
   ansible.builtin.assert:
     that:
       - semaphore_project_id is defined
+      - semaphore_project_id | string | regex('^[0-9]+$')
       - semaphore_project_id | int > 0
     fail_msg: |
-      The '{{ semaphore_api_endpoint }}' endpoint requires semaphore_project_id to be set.
+      The '{{ semaphore_api_endpoint }}' endpoint requires semaphore_project_id to be a positive integer.
       Current value: {{ semaphore_project_id | default('NOT SET') }}
     success_msg: "Project ID validation passed"
   when: semaphore_endpoint_config[semaphore_api_endpoint].requires_project | default(true)
 
+- name: Validate resource_id for endpoints that require it
+  ansible.builtin.assert:
+    that:
+      - semaphore_resource_id is defined
+      - semaphore_resource_id != ""
+      - semaphore_resource_id != None
+      - semaphore_resource_id | string | regex('^[0-9]+$')
+    fail_msg: |
+      The '{{ semaphore_api_endpoint }}' endpoint requires semaphore_resource_id to be a positive integer.
+      Current value: {{ semaphore_resource_id | default('NOT SET') }}
+    success_msg: "Resource ID validation passed"
+  when: semaphore_endpoint_config[semaphore_api_endpoint].requires_resource | default(false)
+
 - name: Validate authentication credentials
   ansible.builtin.assert:
     that:
-      - (semaphore_api_token is defined and semaphore_api_token != "") or (semaphore_api_user is defined and semaphore_api_password is defined)
-    fail_msg: "Either semaphore_api_token or both semaphore_api_user and semaphore_api_password must be provided"
-    success_msg: "Authentication credentials are provided"
+      - >-
+        (semaphore_api_token is defined and
+         semaphore_api_token != "" and
+         semaphore_api_token != "Bearer " and
+         semaphore_api_token | length >= 8) or
+        (semaphore_api_user is defined and
+         semaphore_api_user != "" and
+         semaphore_api_password is defined and
+         semaphore_api_password != "")
+    fail_msg: |
+      Authentication credentials are invalid.
+      Either provide:
+        - semaphore_api_token (minimum 8 characters, not just "Bearer ")
+        - OR both semaphore_api_user and semaphore_api_password (non-empty)
+      Current state:
+        token provided: {{ (semaphore_api_token | default('') | length > 0) | lower }}
+        user provided: {{ (semaphore_api_user | default('') | length > 0) | lower }}
+        password provided: {{ (semaphore_api_password | default('') | length > 0) | lower }}
+    success_msg: "Authentication credentials are valid"
+
+- name: Validate numeric configuration values
+  ansible.builtin.assert:
+    that:
+      - semaphore_api_retries | int >= 0
+      - semaphore_api_retries | int <= 10
+      - semaphore_api_retry_delay | int >= 0
+      - semaphore_api_retry_delay | int <= 300
+      - semaphore_api_timeout | int >= 1
+      - semaphore_api_timeout | int <= 600
+    fail_msg: |
+      Numeric configuration values are out of valid range.
+      - semaphore_api_retries: 0-10 (current: {{ semaphore_api_retries }})
+      - semaphore_api_retry_delay: 0-300 seconds (current: {{ semaphore_api_retry_delay }})
+      - semaphore_api_timeout: 1-600 seconds (current: {{ semaphore_api_timeout }})
+    success_msg: "Numeric configuration values are valid"
+
+- name: Validate query parameters type
+  ansible.builtin.assert:
+    that:
+      - semaphore_api_query_params is mapping
+    fail_msg: |
+      semaphore_api_query_params must be a dictionary/mapping.
+      Current type: {{ semaphore_api_query_params | type_debug }}
+      Example: { "sort": "name", "order": "asc" }
+    success_msg: "Query parameters type is valid"
+  when: semaphore_api_query_params is defined
+
+# ===========================================
+# Debug Output
+# ===========================================
 
 - name: Display API call information
   ansible.builtin.debug:
     msg:
       - "=== Semaphore API GET Request ==="
-      - "Endpoint: {{ semaphore_api_endpoint }}"
+      - "Endpoint: {{ semaphore_api_endpoint }} ({{ semaphore_endpoint_config[semaphore_api_endpoint].description | default('') }})"
       - "Project ID: {{ semaphore_project_id | default('N/A (global endpoint)') }}"
       - "Resource ID: {{ semaphore_resource_id | default('all', true) }}"
       - "API Base URL: {{ semaphore_api_base_url }}"
-      - "Authentication: {% if semaphore_api_token != '' %}Token{% else %}Basic Auth{% endif %}"
+      - "Authentication: {% if semaphore_api_token | default('') != '' %}Token ({{ semaphore_api_token | length }} chars){% else %}Basic Auth ({{ semaphore_api_user }}){% endif %}"
       - "Query Parameters: {{ semaphore_api_query_params | length }} parameter(s)"
+      - "Retry Config: {{ semaphore_api_retries }} retries, {{ semaphore_api_retry_delay }}s delay"
   when: semaphore_api_debug | bool
 
-# Use the generic endpoint handler for all endpoints
+# ===========================================
+# Execute API Request
+# ===========================================
+
 - name: Execute endpoint request
   ansible.builtin.include_tasks: generic_endpoint.yml
