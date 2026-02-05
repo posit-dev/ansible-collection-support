@@ -10,6 +10,21 @@ semaphore_api_token: ""
 semaphore_api_user: "admin"
 semaphore_api_password: "changeme"
 
+# ==============================================
+# Vault Token Management
+# ==============================================
+
+# Path to Ansible vault file containing semaphore_api_token
+# Set to empty string to disable vault integration
+semaphore_api_vault_file: "{{ playbook_dir }}/secrets/vault.yml"
+
+# Vault password file path (optional - can use --vault-password-file or env var)
+semaphore_api_vault_password_file: ""
+
+# Automatically create a new API token if none exists in vault or as fact
+# Requires valid semaphore_api_user and semaphore_api_password
+semaphore_api_auto_create_token: true
+
 # Endpoint to call (27 endpoints available)
 # Global endpoints: ping, info, projects, users, user, user_tokens, events_last
 # Project endpoints: project, inventory, task, tasks_last, task_output, task_raw_output,

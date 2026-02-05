@@ -11,6 +11,7 @@ An Ansible role for making GET requests to Semaphore UI API endpoints. This role
 - [Example Playbooks](#example-playbooks)
 - [Return Values](#return-values)
 - [Authentication](#authentication)
+- [Vault Token Management](#vault-token-management)
 - [Advanced Features](#advanced-features)
   - [Error Handling and Retry Logic](#error-handling-and-retry-logic)
   - [Query Parameters](#query-parameters)
@@ -52,6 +53,14 @@ An Ansible role for making GET requests to Semaphore UI API endpoints. This role
 | `semaphore_api_password` | Password for basic auth | `changeme` |
 
 **Note**: If `semaphore_api_token` is provided, it will be used for authentication. Otherwise, basic authentication with username and password will be used.
+
+### Vault Token Management Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `semaphore_api_vault_file` | Path to Ansible vault file containing token | `{{ playbook_dir }}/secrets/vault.yml` |
+| `semaphore_api_vault_password_file` | Vault password file path | `""` |
+| `semaphore_api_auto_create_token` | Auto-create token if none exists | `true` |
 
 ### Optional Variables
 
@@ -402,6 +411,79 @@ vars:
 ```
 
 **Note**: If both are provided, token authentication takes precedence.
+
+## Vault Token Management
+
+The role supports automatic API token management using Ansible vault files. This enables secure token storage and automatic token creation when needed.
+
+### Vault Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `semaphore_api_vault_file` | Path to Ansible vault file | `{{ playbook_dir }}/secrets/vault.yml` |
+| `semaphore_api_vault_password_file` | Vault password file path | `""` |
+| `semaphore_api_auto_create_token` | Auto-create token if none exists | `true` |
+
+### How It Works
+
+1. **Check for existing token**: If `semaphore_api_token` is already set, use it directly
+2. **Load from vault**: If vault file exists, decrypt and load `semaphore_api_token`
+3. **Create new token**: If no token found and `semaphore_api_auto_create_token` is true, authenticate with username/password and create a new token
+4. **Save to vault**: Newly created tokens are automatically saved to the vault file
+5. **Fatal error**: If no token available and vault doesn't exist, fail with helpful message
+
+### Setup
+
+First, create the vault file:
+
+```bash
+mkdir -p secrets
+ansible-vault create secrets/vault.yml --vault-password-file .vault_pass
+# Add: semaphore_api_token: ""
+```
+
+### Example: Using Vault Token
+
+```yaml
+---
+- name: Get data using vault-stored token
+  hosts: localhost
+  vars:
+    semaphore_api_base_url: "http://localhost:3000/api"
+    semaphore_api_vault_file: "{{ playbook_dir }}/secrets/vault.yml"
+    semaphore_api_vault_password_file: ".vault_pass"
+    semaphore_api_endpoint: "projects"
+  roles:
+    - semaphore-api-get
+```
+
+### Example: Auto-Create Token
+
+```yaml
+---
+- name: Auto-create and store API token
+  hosts: localhost
+  vars:
+    semaphore_api_base_url: "http://localhost:3000/api"
+    semaphore_api_vault_file: "{{ playbook_dir }}/secrets/vault.yml"
+    semaphore_api_vault_password_file: ".vault_pass"
+    semaphore_api_user: "admin"
+    semaphore_api_password: "{{ vault_admin_password }}"
+    semaphore_api_auto_create_token: true
+    semaphore_api_endpoint: "projects"
+  roles:
+    - semaphore-api-get
+```
+
+### Disabling Vault Integration
+
+To disable vault integration entirely:
+
+```yaml
+vars:
+  semaphore_api_vault_file: ""
+  semaphore_api_token: "your-token-here"
+```
 
 ## Advanced Features
 
