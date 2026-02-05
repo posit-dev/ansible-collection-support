@@ -1,11 +1,24 @@
 ---
 # Handlers for slurm-cluster role
+#
+# Handler execution order is important:
+# 1. Munge must restart before Slurm services
+# 2. Controller services before compute services (in multi-play scenarios)
 
 - name: Restart munge
   ansible.builtin.systemd:
     name: munge
     state: restarted
   become: true
+  listen: "restart authentication"
+
+- name: Wait for munge after restart
+  ansible.builtin.wait_for:
+    path: "{{ slurm_munge_run_dir | default('/run/munge') }}/munge.socket.2"
+    state: present
+    timeout: 30
+  become: true
+  listen: "restart authentication"
 
 - name: Restart slurmctld
   ansible.builtin.systemd:
@@ -13,6 +26,7 @@
     state: restarted
   become: true
   when: slurm_node_role == 'controller'
+  listen: "restart slurm services"
 
 - name: Restart slurmd
   ansible.builtin.systemd:
@@ -20,6 +34,7 @@
     state: restarted
   become: true
   when: slurm_node_role == 'compute'
+  listen: "restart slurm services"
 
 - name: Reload slurmctld
   ansible.builtin.systemd:
@@ -27,6 +42,7 @@
     state: reloaded
   become: true
   when: slurm_node_role == 'controller'
+  listen: "reload slurm services"
 
 - name: Reload slurmd
   ansible.builtin.systemd:
@@ -34,6 +50,7 @@
     state: reloaded
   become: true
   when: slurm_node_role == 'compute'
+  listen: "reload slurm services"
 
 - name: Reconfigure slurm
   ansible.builtin.command: scontrol reconfigure

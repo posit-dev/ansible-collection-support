@@ -17,10 +17,23 @@
     owner: root
     group: root
     mode: "0644"
+    validate: "slurmctld -t -f %s"
   become: true
   notify:
-    - Restart slurmctld
+    - Reconfigure slurm
+  when: slurm_node_role == 'controller'
+
+- name: Deploy slurm.conf on compute nodes
+  ansible.builtin.template:
+    src: slurm.conf.j2
+    dest: /etc/slurm/slurm.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify:
     - Restart slurmd
+  when: slurm_node_role == 'compute'
 
 - name: Deploy cgroup.conf
   ansible.builtin.template:
@@ -45,11 +58,3 @@
   notify:
     - Restart slurmctld
     - Restart slurmd
-
-- name: Validate slurm.conf syntax
-  ansible.builtin.command: slurmctld -t
-  register: slurm_config_check
-  changed_when: false
-  failed_when: slurm_config_check.rc != 0
-  become: true
-  when: slurm_node_role == 'controller'

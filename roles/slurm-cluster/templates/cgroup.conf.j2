@@ -12,11 +12,13 @@ ConstrainCores=yes
 # Constrain RAM to job allocation
 ConstrainRAMSpace=yes
 
-# Allow swapping (set to no for strict memory enforcement)
-ConstrainSwapSpace=no
+# Swap space constraint (recommended: yes for production)
+ConstrainSwapSpace={{ 'yes' if slurm_cgroup_constrain_swap else 'no' }}
 
-# Memory limit enforcement (soft or hard)
-# MemorySwappiness=0
+{% if slurm_cgroup_memory_swappiness | string | length > 0 %}
+# Memory swappiness (0-100, lower = less swapping)
+MemorySwappiness={{ slurm_cgroup_memory_swappiness }}
+{% endif %}
 
 # Constrain devices
 ConstrainDevices=yes

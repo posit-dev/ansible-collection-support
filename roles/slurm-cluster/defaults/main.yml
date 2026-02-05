@@ -69,8 +69,11 @@ slurm_shared_storage_path: "/shared"
 slurm_nfs_server: ""
 slurm_nfs_export: "/export/slurm"
 
-# Mount options for NFS
-slurm_nfs_mount_options: "rw,sync,hard,intr,nfsvers=4"
+# Mount options for NFS (note: 'intr' is deprecated for NFSv4)
+slurm_nfs_mount_options: "rw,sync,hard,nfsvers=4"
+
+# NFS port for availability check
+slurm_nfs_port: 2049
 
 # NFS connection timeout (seconds)
 slurm_nfs_timeout: 30
@@ -104,7 +107,16 @@ slurm_cred_type: "cred/none"
 # Munge key - should be the same across all nodes
 # Generate with: dd if=/dev/urandom bs=1 count=1024 | base64 -w0
 # Leave empty to auto-generate on controller and distribute
+# IMPORTANT: For production, store this in Ansible Vault
 slurm_munge_key: ""
+
+# Munge key size in bytes (for auto-generation)
+slurm_munge_key_size: 1024
+
+# Munge directories
+slurm_munge_dir: "/etc/munge"
+slurm_munge_log_dir: "/var/log/munge"
+slurm_munge_run_dir: "/run/munge"
 
 # ==============================================
 # Accounting (Optional)
@@ -132,9 +144,6 @@ slurm_scheduler_type: "sched/backfill"
 # Select type (how resources are allocated)
 slurm_select_type: "select/cons_tres"
 slurm_select_type_parameters: "CR_Core"
-
-# Scheduling parameters
-slurm_fast_schedule: 1
 
 # ==============================================
 # Resource Limits
@@ -234,3 +243,61 @@ slurm_nfs_packages:
 # Enable automatic UFW firewall configuration
 # Set to true to automatically open required ports
 slurm_configure_firewall: false
+
+# ==============================================
+# Service Timeouts
+# ==============================================
+
+# Timeout waiting for services to start (seconds)
+slurm_service_start_timeout: 60
+
+# Timeout waiting for controller connectivity from compute nodes (seconds)
+slurm_controller_connect_timeout: 30
+
+# APT cache validity time (seconds)
+slurm_apt_cache_valid_time: 3600
+
+# Package installation retry attempts
+slurm_package_install_retries: 3
+
+# Delay between package installation retries (seconds)
+slurm_package_install_retry_delay: 5
+
+# ==============================================
+# Cgroup Configuration
+# ==============================================
+
+# Constrain swap space (recommended for production)
+slurm_cgroup_constrain_swap: false
+
+# Memory swappiness (0-100, lower = less swapping)
+# Leave empty to use system default
+slurm_cgroup_memory_swappiness: ""
+
+# Allowed devices for cgroup constraints
+# Set to empty list to use default device list
+slurm_cgroup_allowed_devices:
+  - "/dev/null"
+  - "/dev/zero"
+  - "/dev/random"
+  - "/dev/urandom"
+  - "/dev/tty"
+  - "/dev/pts/*"
+  - "/dev/ptmx"
+  - "/dev/shm/*"
+  - "/dev/cpu/*/*"
+  - "/dev/cpuset"
+
+# Enable GPU device access (adds /dev/nvidia* and /dev/dri/*)
+slurm_cgroup_enable_gpu_devices: false
+
+# ==============================================
+# Slurm User Configuration
+# ==============================================
+
+# Slurm system user UID (set to ensure consistency across nodes)
+# Leave empty for system-assigned UID
+slurm_user_uid: ""
+
+# Slurm system group GID
+slurm_user_gid: ""

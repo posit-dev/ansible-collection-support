@@ -3,7 +3,13 @@
 #
 # List of devices that jobs are allowed to access
 
-# Standard devices
+{% if slurm_cgroup_allowed_devices | length > 0 %}
+# Configured allowed devices
+{% for device in slurm_cgroup_allowed_devices %}
+{{ device }}
+{% endfor %}
+{% else %}
+# Default allowed devices
 /dev/null
 /dev/zero
 /dev/random
@@ -12,17 +18,16 @@
 /dev/pts/*
 /dev/ptmx
 /dev/shm/*
-
-# CPU-related
 /dev/cpu/*/*
 /dev/cpuset
+{% endif %}
 
-# Memory
-/dev/mem
-
-# Networking (optional - uncomment if needed)
-# /dev/net/tun
-
-# GPU devices (uncomment if you have GPUs)
-# /dev/nvidia*
-# /dev/dri/*
+{% if slurm_cgroup_enable_gpu_devices %}
+# GPU devices
+/dev/nvidia*
+/dev/nvidiactl
+/dev/nvidia-uvm
+/dev/nvidia-uvm-tools
+/dev/nvidia-modeset
+/dev/dri/*
+{% endif %}

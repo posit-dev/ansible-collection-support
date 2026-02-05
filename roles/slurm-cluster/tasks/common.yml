@@ -4,27 +4,51 @@
 - name: Update apt cache
   ansible.builtin.apt:
     update_cache: true
-    cache_valid_time: 3600
+    cache_valid_time: "{{ slurm_apt_cache_valid_time }}"
   become: true
+  register: slurm_apt_update
+  retries: "{{ slurm_package_install_retries }}"
+  delay: "{{ slurm_package_install_retry_delay }}"
+  until: slurm_apt_update is success
 
 - name: Install common Slurm packages
   ansible.builtin.apt:
     name: "{{ slurm_common_packages }}"
     state: present
   become: true
+  register: slurm_common_install
+  retries: "{{ slurm_package_install_retries }}"
+  delay: "{{ slurm_package_install_retry_delay }}"
+  until: slurm_common_install is success
 
 - name: Install cgroup support packages
   ansible.builtin.apt:
     name: "{{ slurm_cgroup_packages }}"
     state: present
   become: true
+  register: slurm_cgroup_install
+  retries: "{{ slurm_package_install_retries }}"
+  delay: "{{ slurm_package_install_retry_delay }}"
+  until: slurm_cgroup_install is success
 
 - name: Install NFS client packages
   ansible.builtin.apt:
     name: "{{ slurm_nfs_packages }}"
     state: present
   become: true
+  register: slurm_nfs_install
+  retries: "{{ slurm_package_install_retries }}"
+  delay: "{{ slurm_package_install_retry_delay }}"
+  until: slurm_nfs_install is success
   when: slurm_nfs_server | length > 0
+
+- name: Create Slurm group
+  ansible.builtin.group:
+    name: slurm
+    system: true
+    gid: "{{ slurm_user_gid | default(omit) }}"
+    state: present
+  become: true
 
 - name: Create Slurm user
   ansible.builtin.user:
@@ -33,6 +57,8 @@
     shell: /bin/false
     home: /nonexistent
     create_home: false
+    group: slurm
+    uid: "{{ slurm_user_uid | default(omit) }}"
     state: present
   become: true
 
@@ -60,7 +86,7 @@
 - name: Check NFS server availability
   ansible.builtin.wait_for:
     host: "{{ slurm_nfs_server }}"
-    port: 2049
+    port: "{{ slurm_nfs_port }}"
     timeout: "{{ slurm_nfs_timeout }}"
     state: started
   when: slurm_nfs_server | length > 0
@@ -73,11 +99,21 @@
     opts: "{{ slurm_nfs_mount_options }}"
     state: mounted
   become: true
+  register: slurm_nfs_mount
+  when: slurm_nfs_server | length > 0
+
+- name: Verify NFS mount succeeded
+  ansible.builtin.stat:
+    path: "{{ slurm_shared_storage_path }}"
+  register: slurm_nfs_mount_check
+  failed_when:
+    - slurm_nfs_server | length > 0
+    - not slurm_nfs_mount_check.stat.exists
   when: slurm_nfs_server | length > 0
 
 - name: Ensure Munge directory exists
   ansible.builtin.file:
-    path: /etc/munge
+    path: "{{ slurm_munge_dir }}"
     state: directory
     owner: munge
     group: munge
@@ -86,7 +122,7 @@
 
 - name: Ensure Munge log directory exists
   ansible.builtin.file:
-    path: /var/log/munge
+    path: "{{ slurm_munge_log_dir }}"
     state: directory
     owner: munge
     group: munge
@@ -95,25 +131,44 @@
 
 - name: Ensure Munge run directory exists
   ansible.builtin.file:
-    path: /run/munge
+    path: "{{ slurm_munge_run_dir }}"
     state: directory
     owner: munge
     group: munge
     mode: "0755"
   become: true
 
+- name: Validate controller IP format
+  ansible.builtin.assert:
+    that:
+      - slurm_controller_ip | ansible.utils.ipaddr
+    fail_msg: "slurm_controller_ip '{{ slurm_controller_ip }}' is not a valid IP address"
+    success_msg: "Controller IP validated"
+  when: slurm_controller_ip | length > 0
+
 - name: Add controller to /etc/hosts
   ansible.builtin.lineinfile:
     path: /etc/hosts
     line: "{{ slurm_controller_ip }} {{ slurm_controller_hostname }}"
+    regexp: "^.*\\s+{{ slurm_controller_hostname }}$"
     state: present
   become: true
   when: slurm_controller_ip | length > 0
 
+- name: Validate compute node IP format
+  ansible.builtin.assert:
+    that:
+      - item.ip | ansible.utils.ipaddr
+    fail_msg: "Compute node '{{ item.name }}' has invalid IP '{{ item.ip }}'"
+    success_msg: "Compute node '{{ item.name }}' IP validated"
+  loop: "{{ slurm_compute_nodes }}"
+  when: item.ip is defined and item.ip | length > 0
+
 - name: Add compute nodes to /etc/hosts
   ansible.builtin.lineinfile:
     path: /etc/hosts
-    line: "{{ item.ip | default('') }} {{ item.name }}"
+    line: "{{ item.ip }} {{ item.name }}"
+    regexp: "^.*\\s+{{ item.name }}$"
     state: present
   loop: "{{ slurm_compute_nodes }}"
   become: true
@@ -127,36 +182,14 @@
   become: true
   when: slurm_configure_firewall | bool
 
-- name: Allow Munge traffic (all nodes)
+- name: Allow Slurm ports (all nodes)
   community.general.ufw:
     rule: allow
     port: "{{ item }}"
     proto: tcp
-    comment: "Slurm Munge authentication"
+    comment: "Slurm cluster communication"
   loop:
     - "{{ slurm_slurmctld_port }}"
     - "{{ slurm_slurmd_port }}"
   become: true
   when: slurm_configure_firewall | bool
-
-- name: Allow slurmctld port on controller
-  community.general.ufw:
-    rule: allow
-    port: "{{ slurm_slurmctld_port }}"
-    proto: tcp
-    comment: "Slurm controller daemon"
-  become: true
-  when:
-    - slurm_configure_firewall | bool
-    - slurm_node_role == 'controller'
-
-- name: Allow slurmd port on compute nodes
-  community.general.ufw:
-    rule: allow
-    port: "{{ slurm_slurmd_port }}"
-    proto: tcp
-    comment: "Slurm compute daemon"
-  become: true
-  when:
-    - slurm_configure_firewall | bool
-    - slurm_node_role == 'compute'

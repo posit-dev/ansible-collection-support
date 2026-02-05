@@ -31,5 +31,6 @@ galaxy_info:
     - cgroup
 
 dependencies:
-  - ansible.posix
+  - ansible.posix  # Required for NFS mount module
   - community.general  # Required for UFW firewall module when slurm_configure_firewall=true
+  - ansible.utils  # Required for IP address validation

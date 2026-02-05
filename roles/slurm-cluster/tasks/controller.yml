@@ -6,6 +6,10 @@
     name: "{{ slurm_controller_packages }}"
     state: present
   become: true
+  register: slurm_controller_install
+  retries: "{{ slurm_package_install_retries }}"
+  delay: "{{ slurm_package_install_retry_delay }}"
+  until: slurm_controller_install is success
 
 - name: Create slurmctld state directory
   ansible.builtin.file:
@@ -18,13 +22,13 @@
 
 - name: Check if Munge key already exists
   ansible.builtin.stat:
-    path: /etc/munge/munge.key
+    path: "{{ slurm_munge_dir }}/munge.key"
   register: slurm_existing_munge_key
   become: true
 
 - name: Read existing Munge key if present and no key provided
   ansible.builtin.slurp:
-    src: /etc/munge/munge.key
+    src: "{{ slurm_munge_dir }}/munge.key"
   register: slurm_existing_munge_key_content
   become: true
   when:
@@ -32,10 +36,29 @@
     - slurm_existing_munge_key.stat.exists
   no_log: true
 
+- name: Check /dev/urandom availability
+  ansible.builtin.stat:
+    path: /dev/urandom
+  register: slurm_urandom_check
+  when:
+    - slurm_munge_key | length == 0
+    - not slurm_existing_munge_key.stat.exists
+
+- name: Verify /dev/urandom is available
+  ansible.builtin.assert:
+    that:
+      - slurm_urandom_check.stat.exists
+      - slurm_urandom_check.stat.readable
+    fail_msg: "/dev/urandom is not available or readable - cannot generate Munge key"
+    success_msg: "/dev/urandom is available"
+  when:
+    - slurm_munge_key | length == 0
+    - not slurm_existing_munge_key.stat.exists
+
 - name: Generate Munge key if not provided and not existing
   ansible.builtin.shell: |
     set -o pipefail
-    dd if=/dev/urandom bs=1 count=1024 2>/dev/null | base64 -w0
+    dd if=/dev/urandom bs=1 count={{ slurm_munge_key_size }} 2>/dev/null | base64 -w0
   args:
     executable: /bin/bash
   register: slurm_generated_munge_key
@@ -52,7 +75,7 @@
       - slurm_generated_munge_key.stdout | length > 0
       - slurm_generated_munge_key.rc == 0
     fail_msg: "Failed to generate Munge key - check /dev/urandom availability"
-    success_msg: "Munge key generated successfully"
+    success_msg: "Munge key generated successfully ({{ slurm_munge_key_size }} bytes)"
   when:
     - slurm_munge_key | length == 0
     - not slurm_existing_munge_key.stat.exists
@@ -82,7 +105,7 @@
 - name: Deploy Munge key
   ansible.builtin.copy:
     content: "{{ slurm_actual_munge_key | b64decode }}"
-    dest: /etc/munge/munge.key
+    dest: "{{ slurm_munge_dir }}/munge.key"
     owner: munge
     group: munge
     mode: "0400"
@@ -95,13 +118,24 @@
     slurm_cluster_munge_key: "{{ slurm_actual_munge_key }}"
   delegate_to: localhost
   delegate_facts: true
+  run_once: true
   no_log: true
+
+- name: Flush handlers to ensure Munge restarts before verification
+  ansible.builtin.meta: flush_handlers
 
 - name: Enable and start Munge service
   ansible.builtin.systemd:
     name: munge
     enabled: true
     state: started
+  become: true
+
+- name: Wait for Munge service to be ready
+  ansible.builtin.wait_for:
+    path: "{{ slurm_munge_run_dir }}/munge.socket.2"
+    state: present
+    timeout: 30
   become: true
 
 - name: Verify Munge service is running

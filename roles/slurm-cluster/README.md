@@ -12,11 +12,18 @@ This role installs and configures a minimal Slurm cluster consisting of:
 
 - Ubuntu 24.04 LTS (Noble Numbat) or Ubuntu 22.04 LTS (Jammy Jellyfish)
 - Ansible 2.9+
-- `ansible.posix` collection (for NFS mount module)
-- `community.general` collection (for UFW firewall module, optional)
+- Required Ansible collections:
+  - `ansible.posix` - NFS mount module
+  - `ansible.utils` - IP address validation
+  - `community.general` - UFW firewall module (optional)
 - Root/sudo access on target hosts
 - Network connectivity between nodes
 - Shared network storage (see below)
+
+Install required collections:
+```bash
+ansible-galaxy collection install ansible.posix ansible.utils community.general
+```
 
 ## Shared Network Storage Requirements
 
@@ -123,7 +130,8 @@ The compute node runs user jobs. Size according to your workload requirements.
 | `slurm_nfs_server` | NFS server IP/hostname | `""` |
 | `slurm_nfs_export` | NFS export path | `/export/slurm` |
 | `slurm_shared_storage_path` | Local mount point | `/shared` |
-| `slurm_nfs_mount_options` | NFS mount options | `rw,sync,hard,intr,nfsvers=4` |
+| `slurm_nfs_mount_options` | NFS mount options | `rw,sync,hard,nfsvers=4` |
+| `slurm_nfs_port` | NFS port for availability check | `2049` |
 | `slurm_nfs_timeout` | NFS server availability check timeout (seconds) | `30` |
 
 ### Firewall Configuration
@@ -155,6 +163,41 @@ When `slurm_configure_firewall` is set to `true`, the role will automatically:
 | `slurm_inactive_limit` | Inactive job timeout (0=unlimited) | `0` |
 | `slurm_kill_wait` | Time to wait for job termination (seconds) | `30` |
 | `slurm_min_job_age` | Minimum time to keep completed jobs (seconds) | `300` |
+| `slurm_service_start_timeout` | Timeout waiting for services to start | `60` |
+| `slurm_controller_connect_timeout` | Timeout for compute-to-controller connectivity | `30` |
+
+### Cgroup Configuration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `slurm_cgroup_constrain_swap` | Constrain swap space (recommended for production) | `false` |
+| `slurm_cgroup_memory_swappiness` | Memory swappiness (0-100) | `""` |
+| `slurm_cgroup_allowed_devices` | List of allowed devices for jobs | See defaults |
+| `slurm_cgroup_enable_gpu_devices` | Enable GPU device access | `false` |
+
+### User Configuration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `slurm_user_uid` | Slurm system user UID (ensures consistency across nodes) | `""` (auto) |
+| `slurm_user_gid` | Slurm system group GID | `""` (auto) |
+
+### Munge Configuration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `slurm_munge_key_size` | Munge key size in bytes | `1024` |
+| `slurm_munge_dir` | Munge configuration directory | `/etc/munge` |
+| `slurm_munge_log_dir` | Munge log directory | `/var/log/munge` |
+| `slurm_munge_run_dir` | Munge runtime directory | `/run/munge` |
+
+### Package Installation
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `slurm_apt_cache_valid_time` | APT cache validity time (seconds) | `3600` |
+| `slurm_package_install_retries` | Package installation retry attempts | `3` |
+| `slurm_package_install_retry_delay` | Delay between retries (seconds) | `5` |
 
 ### Full Variable Reference
 
@@ -250,6 +293,24 @@ Then your playbook simplifies to:
   become: true
   roles:
     - slurm-cluster
+```
+
+### Enabling GPU Support
+
+For GPU workloads, enable GPU device access:
+
+```yaml
+slurm_cgroup_enable_gpu_devices: true
+slurm_cgroup_constrain_swap: true  # Recommended for production
+```
+
+### Ensuring Consistent User IDs
+
+For proper NFS operation, ensure the slurm user has the same UID/GID across all nodes:
+
+```yaml
+slurm_user_uid: 64030
+slurm_user_gid: 64030
 ```
 
 ## Automatic Health Checks

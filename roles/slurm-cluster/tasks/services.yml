@@ -25,15 +25,15 @@
 - name: Wait for slurmctld to be available
   ansible.builtin.wait_for:
     port: "{{ slurm_slurmctld_port }}"
-    host: "{{ slurm_controller_hostname }}"
-    timeout: 60
+    host: "{{ slurm_controller_ip | default(slurm_controller_hostname, true) }}"
+    timeout: "{{ slurm_service_start_timeout }}"
   when: slurm_node_role == 'controller'
 
 - name: Wait for slurmd to be available
   ansible.builtin.wait_for:
     port: "{{ slurm_slurmd_port }}"
-    host: "{{ inventory_hostname }}"
-    timeout: 60
+    host: "127.0.0.1"
+    timeout: "{{ slurm_service_start_timeout }}"
   when: slurm_node_role == 'compute'
 
 # Controller health checks
@@ -50,6 +50,9 @@
   changed_when: false
   become: true
   when: slurm_node_role == 'controller'
+  retries: 3
+  delay: 5
+  until: slurm_cluster_status.rc == 0
 
 - name: Display cluster status
   ansible.builtin.debug:
@@ -78,9 +81,9 @@
 
 - name: Verify controller connectivity from compute node
   ansible.builtin.wait_for:
-    host: "{{ slurm_controller_hostname }}"
+    host: "{{ slurm_controller_ip | default(slurm_controller_hostname, true) }}"
     port: "{{ slurm_slurmctld_port }}"
-    timeout: 30
+    timeout: "{{ slurm_controller_connect_timeout }}"
     state: started
   when: slurm_node_role == 'compute'
 
@@ -88,6 +91,9 @@
   ansible.builtin.command: scontrol ping
   register: slurm_ping_result
   changed_when: false
-  failed_when: "'UP' not in slurm_ping_result.stdout"
+  failed_when: slurm_ping_result.rc != 0
   become: true
   when: slurm_node_role == 'compute'
+  retries: 3
+  delay: 5
+  until: slurm_ping_result.rc == 0
