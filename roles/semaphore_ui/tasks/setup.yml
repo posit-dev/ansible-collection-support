@@ -197,7 +197,7 @@
 
     - name: Find existing project by name
       ansible.builtin.set_fact:
-        _existing_project: "{{ existing_projects.json | selectattr('name', 'equalto', semaphore_project_name) | list | first | default(none) }}"
+        _existing_project_list: "{{ existing_projects.json | selectattr('name', 'equalto', semaphore_project_name) | list }}"
 
     - name: Create project if it does not exist
       ansible.builtin.uri:
@@ -214,12 +214,67 @@
           Content-Type: application/json
           Authorization: "Bearer {{ _semaphore_api_token }}"
       register: new_project_response
-      when: _existing_project is none
+      when: _existing_project_list | length == 0
 
     - name: Set project ID fact
       ansible.builtin.set_fact:
-        _semaphore_project_id: "{{ _existing_project.id if _existing_project is not none else new_project_response.json.id }}"
-        _semaphore_project_created: "{{ _existing_project is none }}"
+        _semaphore_project_id: "{{ _existing_project_list[0].id if _existing_project_list | length > 0 else new_project_response.json.id }}"
+        _semaphore_project_created: "{{ _existing_project_list | length == 0 }}"
+
+# ==============================================
+# Empty Key Setup (Required for inventory/repository)
+# ==============================================
+
+- name: Setup empty key for inventory and repository
+  when:
+    - semaphore_create_project | bool
+    - (semaphore_create_inventory | bool) or (semaphore_create_repository | bool)
+  tags:
+    - semaphore
+    - semaphore_setup
+  block:
+    - name: Check if empty key already exists
+      ansible.builtin.uri:
+        url: "{{ semaphore_api_url }}/project/{{ _semaphore_project_id }}/keys"
+        method: GET
+        status_code: "{{ _semaphore_success_codes }}"
+        headers:
+          Content-Type: application/json
+          Authorization: "Bearer {{ _semaphore_api_token }}"
+      register: existing_keys
+
+    - name: Find existing empty key by name
+      ansible.builtin.set_fact:
+        _existing_empty_key_list: "{{ existing_keys.json | selectattr('name', 'equalto', 'None') | list }}"
+
+    - name: Build empty key request body
+      ansible.builtin.set_fact:
+        _empty_key_body: >-
+          {{
+            {
+              "name": "None",
+              "type": "none",
+              "project_id": _semaphore_project_id | int
+            }
+          }}
+      when: _existing_empty_key_list | length == 0
+
+    - name: Create empty key if it does not exist
+      ansible.builtin.uri:
+        url: "{{ semaphore_api_url }}/project/{{ _semaphore_project_id }}/keys"
+        method: POST
+        body_format: json
+        body: "{{ _empty_key_body }}"
+        headers:
+          Content-Type: application/json
+          Authorization: "Bearer {{ _semaphore_api_token }}"
+        status_code: "{{ _semaphore_success_codes }}"
+      register: new_empty_key_response
+      when: _existing_empty_key_list | length == 0
+
+    - name: Set empty key ID fact
+      ansible.builtin.set_fact:
+        _semaphore_empty_key_id: "{{ _existing_empty_key_list[0].id if _existing_empty_key_list | length > 0 else new_empty_key_response.json.id }}"
 
 # ==============================================
 # Inventory Setup (Optional)
@@ -245,31 +300,40 @@
 
     - name: Find existing inventory by name
       ansible.builtin.set_fact:
-        _existing_inventory: "{{ existing_inventories.json | selectattr('name', 'equalto', semaphore_inventory_name) | list | first | default(none) }}"
+        _existing_inventory_list: "{{ existing_inventories.json | selectattr('name', 'equalto', semaphore_inventory_name) | list }}"
+
+    - name: Build inventory request body
+      ansible.builtin.set_fact:
+        _inventory_body: >-
+          {{
+            {
+              "name": semaphore_inventory_name,
+              "project_id": _semaphore_project_id | int,
+              "inventory": semaphore_inventory_content | trim,
+              "type": "static",
+              "ssh_key_id": _semaphore_empty_key_id | int,
+              "become_key_id": _semaphore_empty_key_id | int
+            }
+          }}
+      when: _existing_inventory_list | length == 0
 
     - name: Create inventory if it does not exist
       ansible.builtin.uri:
         url: "{{ semaphore_api_url }}/project/{{ _semaphore_project_id }}/inventory"
         method: POST
         body_format: json
-        body:
-          name: "{{ semaphore_inventory_name }}"
-          project_id: "{{ _semaphore_project_id | int }}"
-          inventory: "{{ semaphore_inventory_content }}"
-          type: "static"
-          ssh_key_id: null
-          become_key_id: null
+        body: "{{ _inventory_body }}"
         headers:
           Content-Type: application/json
           Authorization: "Bearer {{ _semaphore_api_token }}"
         status_code: "{{ _semaphore_success_codes }}"
       register: new_inventory_response
-      when: _existing_inventory is none
+      when: _existing_inventory_list | length == 0
 
     - name: Set inventory ID fact
       ansible.builtin.set_fact:
-        _semaphore_inventory_id: "{{ _existing_inventory.id if _existing_inventory is not none else new_inventory_response.json.id }}"
-        _semaphore_inventory_created: "{{ _existing_inventory is none }}"
+        _semaphore_inventory_id: "{{ _existing_inventory_list[0].id if _existing_inventory_list | length > 0 else new_inventory_response.json.id }}"
+        _semaphore_inventory_created: "{{ _existing_inventory_list | length == 0 }}"
 
 # ==============================================
 # Repository Setup (Optional)
@@ -295,31 +359,39 @@
 
     - name: Find existing repository by name
       ansible.builtin.set_fact:
-        _existing_repository: "{{ existing_repositories.json | selectattr('name', 'equalto', semaphore_repository_name) | list | first | default(none) }}"
+        _existing_repository_list: "{{ existing_repositories.json | selectattr('name', 'equalto', semaphore_repository_name) | list }}"
+
+    - name: Build repository request body
+      ansible.builtin.set_fact:
+        _repository_body: >-
+          {{
+            {
+              "name": semaphore_repository_name,
+              "git_url": semaphore_repository_path,
+              "project_id": _semaphore_project_id | int,
+              "git_branch": "",
+              "ssh_key_id": _semaphore_empty_key_id | int
+            }
+          }}
+      when: _existing_repository_list | length == 0
 
     - name: Create repository if it does not exist
       ansible.builtin.uri:
         url: "{{ semaphore_api_url }}/project/{{ _semaphore_project_id }}/repositories"
         method: POST
         body_format: json
-        body:
-          id: 0
-          name: "{{ semaphore_repository_name }}"
-          git_url: "{{ semaphore_repository_path }}"
-          project_id: "{{ _semaphore_project_id | int }}"
-          git_branch: ""
-          ssh_key_id: null
+        body: "{{ _repository_body }}"
         headers:
           Content-Type: application/json
           Authorization: "Bearer {{ _semaphore_api_token }}"
         status_code: "{{ _semaphore_success_codes }}"
       register: new_repository_response
-      when: _existing_repository is none
+      when: _existing_repository_list | length == 0
 
     - name: Set repository ID fact
       ansible.builtin.set_fact:
-        _semaphore_repository_id: "{{ _existing_repository.id if _existing_repository is not none else new_repository_response.json.id }}"
-        _semaphore_repository_created: "{{ _existing_repository is none }}"
+        _semaphore_repository_id: "{{ _existing_repository_list[0].id if _existing_repository_list | length > 0 else new_repository_response.json.id }}"
+        _semaphore_repository_created: "{{ _existing_repository_list | length == 0 }}"
 
 # ==============================================
 # Additional Users (Optional)

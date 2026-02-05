@@ -37,5 +37,6 @@ galaxy_info:
     - automation
     - devops
 
-dependencies:
-  - containers.podman  # Required for container and volume management
+dependencies: []
+  # Note: Requires the containers.podman collection to be installed:
+  # ansible-galaxy collection install containers.podman

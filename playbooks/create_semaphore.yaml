@@ -1,0 +1,13 @@
+---
+# create_semaphore.yaml - Deploy Semaphore UI using the semaphore_ui role
+#
+# Usage:
+#   ansible-playbook playbooks/create_semaphore.yaml -e semaphore_admin_password=YourSecurePassword123
+
+- name: Deploy Semaphore UI
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  roles:
+    - role: semaphore_ui
