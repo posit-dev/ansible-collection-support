@@ -1,0 +1,23 @@
+---
+- name: Converge
+  hosts: all
+  gather_facts: true
+
+  pre_tasks:
+    - name: Install Podman (Ubuntu/Debian)
+      ansible.builtin.apt:
+        name: podman
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+      become: true
+
+    - name: Install Podman (RedHat/Fedora)
+      ansible.builtin.dnf:
+        name: podman
+        state: present
+      when: ansible_os_family == "RedHat"
+      become: true
+
+  roles:
+    - role: semaphore_ui

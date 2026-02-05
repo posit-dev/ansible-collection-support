@@ -8,8 +8,10 @@ Ansible role for deploying [Semaphore UI](https://semaphoreui.com/) using Podman
 - [Requirements](#requirements)
 - [Role Variables](#role-variables)
 - [Task Tags](#task-tags)
+- [Handlers](#handlers)
 - [Examples](#examples)
 - [Idempotency](#idempotency)
+- [Testing](#testing)
 - [Troubleshooting](#troubleshooting)
 
 ## Description
@@ -136,6 +138,26 @@ Each user in the list requires:
 | `semaphore_setup` | Container and API setup |
 | `semaphore_cleanup` | Remove container and data |
 
+## Handlers
+
+The role provides handlers for container lifecycle management:
+
+| Handler | Description |
+|---------|-------------|
+| `restart semaphore` | Restart the container and wait for API |
+| `stop semaphore` | Stop the container |
+| `recreate semaphore` | Recreate container with current configuration |
+
+### Using Handlers
+
+```yaml
+- name: Update configuration and restart
+  ansible.builtin.copy:
+    content: "{{ config_content }}"
+    dest: /some/config/path
+  notify: restart semaphore
+```
+
 ## Examples
 
 ### Basic Setup
@@ -234,6 +256,42 @@ This role is designed to be idempotent:
 - **Users**: Checks for existing username before creating
 
 Running the role multiple times with the same configuration will not create duplicate resources.
+
+## Testing
+
+This role includes Molecule tests for verification.
+
+### Prerequisites
+
+```bash
+pip install molecule molecule-podman ansible-core
+```
+
+### Running Tests
+
+```bash
+# Run default test scenario (setup and verify)
+molecule test
+
+# Run cleanup scenario
+molecule test -s cleanup
+
+# Run converge only (no destroy)
+molecule converge
+
+# Run verification only
+molecule verify
+
+# Login to test instance for debugging
+molecule login
+```
+
+### Test Scenarios
+
+| Scenario | Description |
+|----------|-------------|
+| `default` | Full setup with project, inventory, repository, and users |
+| `cleanup` | Tests setup followed by cleanup to verify removal |
 
 ## Troubleshooting
 

@@ -1,0 +1,39 @@
+---
+- name: Verify Cleanup
+  hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: Check if container exists
+      containers.podman.podman_container_info:
+        name: semaphore
+      register: container_info
+      failed_when: false
+
+    - name: Assert container is removed
+      ansible.builtin.assert:
+        that:
+          - container_info.containers | length == 0
+        fail_msg: "Semaphore container still exists after cleanup"
+        success_msg: "Semaphore container was removed"
+
+    - name: Check if volume exists
+      ansible.builtin.command:
+        cmd: podman volume inspect semaphore_data
+      register: volume_info
+      failed_when: false
+      changed_when: false
+
+    - name: Assert volume is removed
+      ansible.builtin.assert:
+        that:
+          - volume_info.rc != 0
+        fail_msg: "Semaphore volume still exists after cleanup"
+        success_msg: "Semaphore volume was removed"
+
+    - name: Display cleanup verification summary
+      ansible.builtin.debug:
+        msg:
+          - "Cleanup verification passed!"
+          - "  - Container removed: OK"
+          - "  - Volume removed: OK"

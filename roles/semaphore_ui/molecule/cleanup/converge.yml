@@ -1,0 +1,44 @@
+---
+- name: Converge - Setup then Cleanup
+  hosts: all
+  gather_facts: true
+
+  pre_tasks:
+    - name: Install Podman (Ubuntu/Debian)
+      ansible.builtin.apt:
+        name: podman
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+      become: true
+
+    - name: Install Podman (RedHat/Fedora)
+      ansible.builtin.dnf:
+        name: podman
+        state: present
+      when: ansible_os_family == "RedHat"
+      become: true
+
+  tasks:
+    - name: Setup Semaphore UI
+      ansible.builtin.include_role:
+        name: semaphore_ui
+      vars:
+        semaphore_cleanup: false
+
+    - name: Verify container exists before cleanup
+      containers.podman.podman_container_info:
+        name: semaphore
+      register: pre_cleanup_container
+
+    - name: Assert container exists
+      ansible.builtin.assert:
+        that:
+          - pre_cleanup_container.containers | length > 0
+        fail_msg: "Container should exist before cleanup"
+
+    - name: Run cleanup
+      ansible.builtin.include_role:
+        name: semaphore_ui
+      vars:
+        semaphore_cleanup: true

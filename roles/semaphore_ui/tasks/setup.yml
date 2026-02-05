@@ -72,70 +72,108 @@
 # ==============================================
 
 - name: Wait for Semaphore API to become available
-  ansible.builtin.uri:
-    url: "{{ semaphore_api_url }}{{ _semaphore_endpoints.ping }}"
-    method: GET
-    status_code: "{{ _semaphore_success_codes }}"
-  register: api_health
-  until: api_health.status in _semaphore_success_codes
-  retries: "{{ (semaphore_wait_timeout / semaphore_wait_delay) | int }}"
-  delay: "{{ semaphore_wait_delay }}"
   tags:
     - semaphore
     - semaphore_setup
+  block:
+    - name: Check API health
+      ansible.builtin.uri:
+        url: "{{ semaphore_api_url }}{{ _semaphore_endpoints.ping }}"
+        method: GET
+        status_code: "{{ _semaphore_success_codes }}"
+      register: api_health
+      until: api_health.status in _semaphore_success_codes
+      retries: "{{ (semaphore_wait_timeout / semaphore_wait_delay) | int }}"
+      delay: "{{ semaphore_wait_delay }}"
+  rescue:
+    - name: API health check failed - get container logs
+      ansible.builtin.command:
+        cmd: "podman logs --tail 50 {{ semaphore_container_name }}"
+      register: container_logs
+      changed_when: false
+      failed_when: false
+
+    - name: Display troubleshooting information
+      ansible.builtin.fail:
+        msg: |
+          ERROR: Semaphore API failed to become available within {{ semaphore_wait_timeout }} seconds.
+
+          Troubleshooting:
+            - URL attempted: {{ semaphore_api_url }}{{ _semaphore_endpoints.ping }}
+            - Container: {{ semaphore_container_name }}
+
+          Recent container logs:
+          {{ container_logs.stdout | default('No logs available') }}
+
+          Possible causes:
+            - Container failed to start properly
+            - Port {{ semaphore_host_port }} is already in use
+            - Database initialization failed
 
 # ==============================================
 # Authentication
 # ==============================================
 
-- name: Authenticate and get session cookie
-  ansible.builtin.uri:
-    url: "{{ semaphore_api_url }}{{ _semaphore_endpoints.login }}"
-    method: POST
-    body_format: json
-    body:
-      auth: "{{ semaphore_admin_user }}"
-      password: "{{ semaphore_admin_password }}"
-    status_code: "{{ _semaphore_success_codes }}"
-    headers:
-      Content-Type: application/json
-  register: auth_response
-  no_log: true
+- name: Authenticate to Semaphore API
   tags:
     - semaphore
     - semaphore_setup
+  block:
+    - name: Authenticate and get session cookie
+      ansible.builtin.uri:
+        url: "{{ semaphore_api_url }}{{ _semaphore_endpoints.login }}"
+        method: POST
+        body_format: json
+        body:
+          auth: "{{ semaphore_admin_user }}"
+          password: "{{ semaphore_admin_password }}"
+        status_code: "{{ _semaphore_success_codes }}"
+        headers:
+          Content-Type: application/json
+      register: auth_response
+      no_log: true
+      retries: "{{ semaphore_api_retries }}"
+      delay: "{{ semaphore_api_retry_delay }}"
+      until: auth_response.status in _semaphore_success_codes
 
-- name: Extract session cookie
-  ansible.builtin.set_fact:
-    _semaphore_session_cookie: "{{ auth_response.cookies_string }}"
-  no_log: true
-  tags:
-    - semaphore
-    - semaphore_setup
+    - name: Extract session cookie
+      ansible.builtin.set_fact:
+        _semaphore_session_cookie: "{{ auth_response.cookies_string }}"
+      no_log: true
 
-- name: Create API token
-  ansible.builtin.uri:
-    url: "{{ semaphore_api_url }}{{ _semaphore_endpoints.tokens }}"
-    method: POST
-    body_format: json
-    body: {}
-    status_code: "{{ _semaphore_success_codes }}"
-    headers:
-      Content-Type: application/json
-      Cookie: "{{ _semaphore_session_cookie }}"
-  register: token_response
-  no_log: true
-  tags:
-    - semaphore
-    - semaphore_setup
+    - name: Create API token
+      ansible.builtin.uri:
+        url: "{{ semaphore_api_url }}{{ _semaphore_endpoints.tokens }}"
+        method: POST
+        body_format: json
+        body: {}
+        status_code: "{{ _semaphore_success_codes }}"
+        headers:
+          Content-Type: application/json
+          Cookie: "{{ _semaphore_session_cookie }}"
+      register: token_response
+      no_log: true
+      retries: "{{ semaphore_api_retries }}"
+      delay: "{{ semaphore_api_retry_delay }}"
+      until: token_response.status in _semaphore_success_codes
 
-- name: Set API token fact
-  ansible.builtin.set_fact:
-    _semaphore_api_token: "{{ token_response.json.id }}"
-  no_log: true
-  tags:
-    - semaphore
-    - semaphore_setup
+    - name: Set API token fact
+      ansible.builtin.set_fact:
+        _semaphore_api_token: "{{ token_response.json.id }}"
+      no_log: true
+  rescue:
+    - name: Authentication failed
+      ansible.builtin.fail:
+        msg: |
+          ERROR: Failed to authenticate to Semaphore API.
+
+          Possible causes:
+            - Invalid admin credentials
+            - API is not fully initialized
+            - Network connectivity issues
+
+          Admin user: {{ semaphore_admin_user }}
+          API URL: {{ semaphore_api_url }}
 
 # ==============================================
 # Project Setup (Optional)

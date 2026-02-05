@@ -1,0 +1,50 @@
+---
+dependency:
+  name: galaxy
+  options:
+    requirements-file: requirements.yml
+
+driver:
+  name: podman
+
+platforms:
+  - name: semaphore-test
+    image: docker.io/geerlingguy/docker-ubuntu2204-ansible:latest
+    pre_build_image: true
+    privileged: true
+    volumes:
+      - /var/run/podman/podman.sock:/var/run/podman/podman.sock:ro
+    command: /lib/systemd/systemd
+
+provisioner:
+  name: ansible
+  playbooks:
+    converge: converge.yml
+    verify: verify.yml
+  inventory:
+    host_vars:
+      semaphore-test:
+        semaphore_admin_password: "TestPassword123!"
+        semaphore_project_name: "Molecule Test Project"
+        semaphore_host_port: 3001
+        semaphore_additional_users:
+          - name: "Test User"
+            username: "testuser"
+            email: "test@example.com"
+            password: "TestUserPass123!"
+            admin: false
+
+verifier:
+  name: ansible
+
+scenario:
+  name: default
+  test_sequence:
+    - dependency
+    - syntax
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - verify
+    - destroy

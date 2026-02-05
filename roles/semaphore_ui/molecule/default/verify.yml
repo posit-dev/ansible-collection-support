@@ -1,0 +1,150 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+
+  vars:
+    semaphore_api_url: "http://localhost:3001/api"
+    semaphore_admin_user: "admin"
+    semaphore_admin_password: "TestPassword123!"
+
+  tasks:
+    - name: Verify container is running
+      containers.podman.podman_container_info:
+        name: semaphore
+      register: container_info
+
+    - name: Assert container is running
+      ansible.builtin.assert:
+        that:
+          - container_info.containers | length > 0
+          - container_info.containers[0].State.Running
+        fail_msg: "Semaphore container is not running"
+        success_msg: "Semaphore container is running"
+
+    - name: Verify API is responding
+      ansible.builtin.uri:
+        url: "{{ semaphore_api_url }}/ping"
+        method: GET
+        status_code: [200, 204]
+      register: api_ping
+
+    - name: Assert API is healthy
+      ansible.builtin.assert:
+        that:
+          - api_ping.status in [200, 204]
+        fail_msg: "Semaphore API is not responding"
+        success_msg: "Semaphore API is healthy"
+
+    - name: Authenticate to verify credentials work
+      ansible.builtin.uri:
+        url: "{{ semaphore_api_url }}/auth/login"
+        method: POST
+        body_format: json
+        body:
+          auth: "{{ semaphore_admin_user }}"
+          password: "{{ semaphore_admin_password }}"
+        status_code: [200, 204]
+      register: auth_response
+      no_log: true
+
+    - name: Assert authentication succeeded
+      ansible.builtin.assert:
+        that:
+          - auth_response.status in [200, 204]
+          - auth_response.cookies_string is defined
+        fail_msg: "Authentication failed"
+        success_msg: "Authentication successful"
+
+    - name: Get API token for further verification
+      ansible.builtin.uri:
+        url: "{{ semaphore_api_url }}/user/tokens"
+        method: POST
+        body_format: json
+        body: {}
+        status_code: [200, 201]
+        headers:
+          Content-Type: application/json
+          Cookie: "{{ auth_response.cookies_string }}"
+      register: token_response
+      no_log: true
+
+    - name: Verify project was created
+      ansible.builtin.uri:
+        url: "{{ semaphore_api_url }}/projects"
+        method: GET
+        status_code: [200]
+        headers:
+          Authorization: "Bearer {{ token_response.json.id }}"
+      register: projects_response
+
+    - name: Assert project exists
+      ansible.builtin.assert:
+        that:
+          - projects_response.json | selectattr('name', 'equalto', 'Molecule Test Project') | list | length > 0
+        fail_msg: "Project 'Molecule Test Project' was not created"
+        success_msg: "Project 'Molecule Test Project' exists"
+
+    - name: Get project ID
+      ansible.builtin.set_fact:
+        test_project_id: "{{ (projects_response.json | selectattr('name', 'equalto', 'Molecule Test Project') | list | first).id }}"
+
+    - name: Verify inventory was created
+      ansible.builtin.uri:
+        url: "{{ semaphore_api_url }}/project/{{ test_project_id }}/inventory"
+        method: GET
+        status_code: [200]
+        headers:
+          Authorization: "Bearer {{ token_response.json.id }}"
+      register: inventory_response
+
+    - name: Assert inventory exists
+      ansible.builtin.assert:
+        that:
+          - inventory_response.json | selectattr('name', 'equalto', 'localhost') | list | length > 0
+        fail_msg: "Inventory 'localhost' was not created"
+        success_msg: "Inventory 'localhost' exists"
+
+    - name: Verify repository was created
+      ansible.builtin.uri:
+        url: "{{ semaphore_api_url }}/project/{{ test_project_id }}/repositories"
+        method: GET
+        status_code: [200]
+        headers:
+          Authorization: "Bearer {{ token_response.json.id }}"
+      register: repo_response
+
+    - name: Assert repository exists
+      ansible.builtin.assert:
+        that:
+          - repo_response.json | selectattr('name', 'equalto', 'Local Playbooks') | list | length > 0
+        fail_msg: "Repository 'Local Playbooks' was not created"
+        success_msg: "Repository 'Local Playbooks' exists"
+
+    - name: Verify additional user was created
+      ansible.builtin.uri:
+        url: "{{ semaphore_api_url }}/users"
+        method: GET
+        status_code: [200]
+        headers:
+          Authorization: "Bearer {{ token_response.json.id }}"
+      register: users_response
+
+    - name: Assert additional user exists
+      ansible.builtin.assert:
+        that:
+          - users_response.json | selectattr('username', 'equalto', 'testuser') | list | length > 0
+        fail_msg: "User 'testuser' was not created"
+        success_msg: "User 'testuser' exists"
+
+    - name: Display verification summary
+      ansible.builtin.debug:
+        msg:
+          - "All verifications passed!"
+          - "  - Container running: OK"
+          - "  - API responding: OK"
+          - "  - Authentication: OK"
+          - "  - Project created: OK"
+          - "  - Inventory created: OK"
+          - "  - Repository created: OK"
+          - "  - Additional user created: OK"

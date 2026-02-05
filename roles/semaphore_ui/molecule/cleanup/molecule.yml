@@ -1,0 +1,42 @@
+---
+dependency:
+  name: galaxy
+  options:
+    requirements-file: ../default/requirements.yml
+
+driver:
+  name: podman
+
+platforms:
+  - name: semaphore-cleanup-test
+    image: docker.io/geerlingguy/docker-ubuntu2204-ansible:latest
+    pre_build_image: true
+    privileged: true
+    volumes:
+      - /var/run/podman/podman.sock:/var/run/podman/podman.sock:ro
+    command: /lib/systemd/systemd
+
+provisioner:
+  name: ansible
+  playbooks:
+    converge: converge.yml
+    verify: verify.yml
+  inventory:
+    host_vars:
+      semaphore-cleanup-test:
+        semaphore_admin_password: "CleanupTestPass123!"
+        semaphore_host_port: 3002
+
+verifier:
+  name: ansible
+
+scenario:
+  name: cleanup
+  test_sequence:
+    - dependency
+    - syntax
+    - create
+    - prepare
+    - converge
+    - verify
+    - destroy
