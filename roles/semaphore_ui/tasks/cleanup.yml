@@ -7,23 +7,39 @@
     state: stopped
   register: container_stopped
   ignore_errors: true
+  tags:
+    - semaphore
+    - semaphore_cleanup
 
 - name: Remove semaphore container
   containers.podman.podman_container:
     name: "{{ semaphore_container_name }}"
     state: absent
   register: container_removed
+  tags:
+    - semaphore
+    - semaphore_cleanup
 
 - name: Remove semaphore volume
   containers.podman.podman_volume:
     name: "{{ semaphore_volume_name }}"
     state: absent
   register: volume_removed
+  tags:
+    - semaphore
+    - semaphore_cleanup
 
 - name: Display cleanup summary
   ansible.builtin.debug:
     msg:
-      - "Cleanup completed:"
-      - "  Container stopped: {{ container_stopped is succeeded }}"
-      - "  Container removed: {{ container_removed is succeeded }}"
-      - "  Volume removed: {{ volume_removed is succeeded }}"
+      - "Semaphore UI cleanup completed:"
+      - ""
+      - "  Container '{{ semaphore_container_name }}':"
+      - "    - Stopped: {{ 'yes' if container_stopped is succeeded else 'no (may not have been running)' }}"
+      - "    - Removed: {{ 'yes' if container_removed is changed else 'no (may not have existed)' }}"
+      - ""
+      - "  Volume '{{ semaphore_volume_name }}':"
+      - "    - Removed: {{ 'yes' if volume_removed is changed else 'no (may not have existed)' }}"
+  tags:
+    - semaphore
+    - semaphore_cleanup

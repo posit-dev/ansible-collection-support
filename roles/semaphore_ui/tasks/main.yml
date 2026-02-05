@@ -1,10 +1,22 @@
 ---
-# tasks/main.yml - Main tasks for semaphore_ui role
+# tasks/main.yml - Main entry point for semaphore_ui role
+
+- name: Validate input variables
+  ansible.builtin.include_tasks: validate.yml
+  tags:
+    - semaphore
+    - semaphore_validate
 
 - name: Include cleanup tasks
   ansible.builtin.include_tasks: cleanup.yml
-  when: cleanup | bool
+  when: semaphore_cleanup | bool
+  tags:
+    - semaphore
+    - semaphore_cleanup
 
 - name: Include setup tasks
   ansible.builtin.include_tasks: setup.yml
-  when: not (cleanup | bool)
+  when: not (semaphore_cleanup | bool)
+  tags:
+    - semaphore
+    - semaphore_setup

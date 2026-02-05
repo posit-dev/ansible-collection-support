@@ -1,0 +1,41 @@
+---
+galaxy_info:
+  author: Heath Provost
+  namespace: support
+  description: >-
+    Ansible role for deploying Semaphore UI using Podman containers.
+    Provides automated setup with BoltDB backend, admin user creation,
+    and optional project/inventory/repository initialization. Includes
+    comprehensive input validation and idempotent operations.
+  company: ""
+
+  license: MIT
+
+  min_ansible_version: "2.9"
+
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble   # 24.04
+        - jammy   # 22.04
+        - focal   # 20.04
+    - name: Fedora
+      versions:
+        - all
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+
+  galaxy_tags:
+    - semaphore
+    - ansible
+    - ui
+    - container
+    - podman
+    - cicd
+    - automation
+    - devops
+
+dependencies:
+  - containers.podman  # Required for container and volume management

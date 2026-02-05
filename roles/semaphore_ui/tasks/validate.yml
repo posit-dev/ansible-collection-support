@@ -1,0 +1,121 @@
+---
+# tasks/validate.yml - Input validation for semaphore_ui role
+
+- name: Validate required variables
+  tags:
+    - semaphore
+    - semaphore_validate
+  block:
+    - name: Validate semaphore_admin_password is provided
+      ansible.builtin.assert:
+        that:
+          - semaphore_admin_password is defined
+          - semaphore_admin_password | length > 0
+        fail_msg: |
+          ERROR: semaphore_admin_password is required but not set.
+
+          Please provide the admin password using one of these methods:
+            - Command line: -e semaphore_admin_password=YourSecurePassword
+            - Inventory vars: semaphore_admin_password: "YourSecurePassword"
+            - Vault-encrypted variable
+
+          Current value: {{ semaphore_admin_password | default('(not defined)') | regex_replace('.', '*') }}
+        success_msg: "Admin password is provided"
+
+    - name: Validate port numbers
+      ansible.builtin.assert:
+        that:
+          - semaphore_port | int > 0
+          - semaphore_port | int < 65536
+          - semaphore_host_port | int > 0
+          - semaphore_host_port | int < 65536
+        fail_msg: |
+          ERROR: Invalid port configuration.
+
+          semaphore_port: {{ semaphore_port }} (must be 1-65535)
+          semaphore_host_port: {{ semaphore_host_port }} (must be 1-65535)
+        success_msg: "Port configuration is valid"
+
+    - name: Validate container name
+      ansible.builtin.assert:
+        that:
+          - semaphore_container_name is defined
+          - semaphore_container_name | length > 0
+          - semaphore_container_name is regex('^[a-zA-Z0-9][a-zA-Z0-9_.-]*$')
+        fail_msg: |
+          ERROR: Invalid container name.
+
+          semaphore_container_name: {{ semaphore_container_name }}
+          Container names must start with alphanumeric and contain only letters, numbers, underscores, periods, and hyphens.
+        success_msg: "Container name is valid"
+
+    - name: Validate additional users structure
+      ansible.builtin.assert:
+        that:
+          - semaphore_additional_users is iterable
+          - semaphore_additional_users is not string
+        fail_msg: |
+          ERROR: semaphore_additional_users must be a list.
+
+          Current type: {{ semaphore_additional_users | type_debug }}
+          Expected: list of user dictionaries
+
+          Example:
+            semaphore_additional_users:
+              - name: "John Doe"
+                username: "jdoe"
+                email: "jdoe@example.com"
+                password: "secure_password"
+        success_msg: "Additional users structure is valid"
+      when: semaphore_additional_users | length > 0
+
+    - name: Validate each additional user has required fields
+      ansible.builtin.assert:
+        that:
+          - item.name is defined and item.name | length > 0
+          - item.username is defined and item.username | length > 0
+          - item.email is defined and item.email | length > 0
+          - item.password is defined and item.password | length > 0
+        fail_msg: |
+          ERROR: Additional user is missing required fields.
+
+          User entry: {{ item }}
+          Required fields: name, username, email, password
+
+          Example:
+            - name: "John Doe"
+              username: "jdoe"
+              email: "jdoe@example.com"
+              password: "secure_password"
+        success_msg: "User '{{ item.username }}' has all required fields"
+      loop: "{{ semaphore_additional_users }}"
+      loop_control:
+        label: "{{ item.username | default('(no username)') }}"
+      when: semaphore_additional_users | length > 0
+
+- name: Validate system requirements
+  tags:
+    - semaphore
+    - semaphore_validate
+  when: not (semaphore_cleanup | bool)
+  block:
+    - name: Check if Podman is available
+      ansible.builtin.command:
+        cmd: podman --version
+      register: podman_check
+      changed_when: false
+      failed_when: false
+
+    - name: Fail if Podman is not installed
+      ansible.builtin.fail:
+        msg: |
+          ERROR: Podman is not installed or not in PATH.
+
+          This role requires Podman for container management.
+          Please install Podman before running this role.
+
+          Installation guides:
+            - Ubuntu/Debian: sudo apt install podman
+            - Fedora/RHEL: sudo dnf install podman
+            - macOS: brew install podman
+      when: podman_check.rc != 0

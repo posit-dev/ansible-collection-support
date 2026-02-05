@@ -1,27 +1,147 @@
 ---
 # defaults/main.yml - Default variables for semaphore_ui role
 
-# Cleanup mode - when true, stops and removes container and storage
-cleanup: false
+# ==============================================
+# Operation Mode
+# ==============================================
 
-# Container settings
+# Set to true to stop and remove container and storage
+semaphore_cleanup: false
+
+# ==============================================
+# Container Settings
+# ==============================================
+
+# Container name for identification
 semaphore_container_name: semaphore
+
+# Container image to use
 semaphore_image: docker.io/semaphoreui/semaphore:latest
+
+# Port inside the container
 semaphore_port: 3000
+
+# Port exposed on the host
 semaphore_host_port: 3000
 
-# Volume settings
+# Container restart policy (always, on-failure, no)
+semaphore_restart_policy: always
+
+# ==============================================
+# Volume Settings
+# ==============================================
+
+# Volume name for persistent Semaphore data
 semaphore_volume_name: semaphore_data
 
-# Admin user settings
+# Path to mount at /git in container for local playbooks
+# Leave empty to use playbook_dir
+semaphore_git_volume: ""
+
+# ==============================================
+# Admin User Settings
+# ==============================================
+
+# Admin username for initial setup
 semaphore_admin_user: admin
+
+# Admin password - REQUIRED, must be provided by user
+# Example: ansible-playbook site.yml -e semaphore_admin_password=MySecurePass123
+semaphore_admin_password: ""
+
+# Admin email address
 semaphore_admin_email: admin@localhost
+
+# Admin display name
 semaphore_admin_name: "Admin User"
 
-# Project settings
+# ==============================================
+# Security Settings
+# ==============================================
+
+# Encryption key for access tokens
+# If empty, a key will be auto-generated and cached
+# For production, provide a consistent 32+ character string
+semaphore_access_key_encryption: ""
+
+# ==============================================
+# Project Settings (Optional)
+# ==============================================
+
+# Whether to create an initial project
+semaphore_create_project: true
+
+# Name for the initial project
 semaphore_project_name: "Ansible Tests"
 
-# API settings
-semaphore_api_url: "http://localhost:{{ semaphore_host_port }}/api"
+# ==============================================
+# Initial Inventory (Optional)
+# ==============================================
+
+# Whether to create an initial inventory
+semaphore_create_inventory: true
+
+# Name for the initial inventory
+semaphore_inventory_name: "localhost"
+
+# Inventory content (static inventory format)
+semaphore_inventory_content: |
+  [all]
+  localhost ansible_connection=local
+
+# ==============================================
+# Initial Repository (Optional)
+# ==============================================
+
+# Whether to create an initial repository
+semaphore_create_repository: true
+
+# Name for the initial repository
+semaphore_repository_name: "Local Playbooks"
+
+# Path to repository inside container (maps to git_volume)
+semaphore_repository_path: "/git"
+
+# ==============================================
+# Additional Users (Optional)
+# ==============================================
+
+# List of additional users to create after setup
+# Each user requires: name, username, email, password
+# Optional: admin (default: false)
+#
+# Example:
+#   semaphore_additional_users:
+#     - name: "John Doe"
+#       username: "jdoe"
+#       email: "jdoe@example.com"
+#       password: "secure_password"
+#       admin: false
+#     - name: "Jane Smith"
+#       username: "jsmith"
+#       email: "jsmith@example.com"
+#       password: "another_password"
+#       admin: true
+semaphore_additional_users: []
+
+# ==============================================
+# API Settings
+# ==============================================
+
+# Host for API connections (use container host IP for remote)
+semaphore_api_host: "localhost"
+
+# Full API URL (auto-constructed from host and port)
+semaphore_api_url: "http://{{ semaphore_api_host }}:{{ semaphore_host_port }}/api"
+
+# Maximum time to wait for API availability (seconds)
 semaphore_wait_timeout: 120
+
+# Delay between API availability checks (seconds)
 semaphore_wait_delay: 5
+
+# Number of retries for API operations
+semaphore_api_retries: 3
+
+# Delay between API operation retries (seconds)
+semaphore_api_retry_delay: 2

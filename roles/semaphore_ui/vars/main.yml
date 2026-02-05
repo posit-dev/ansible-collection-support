@@ -1,0 +1,26 @@
+---
+# vars/main.yml - Internal constants for semaphore_ui role
+# These should not be modified by users
+
+# Database configuration
+_semaphore_db_dialect: bolt
+
+# Container paths
+_semaphore_data_path: /var/lib/semaphore
+_semaphore_git_mount: /git
+
+# API endpoints
+_semaphore_endpoints:
+  ping: /ping
+  login: /auth/login
+  tokens: /user/tokens
+  projects: /projects
+  inventory: /project/{id}/inventory
+  repositories: /project/{id}/repositories
+  users: /users
+
+# HTTP status codes for success
+_semaphore_success_codes:
+  - 200
+  - 201
+  - 204
