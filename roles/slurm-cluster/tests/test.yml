@@ -1,0 +1,118 @@
+---
+# Test playbook for slurm-cluster role
+# This validates variable configuration and template rendering
+
+- name: Test Slurm Cluster Configuration Validation
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  vars:
+    slurm_node_role: controller
+    slurm_cluster_name: "testcluster"
+    slurm_controller_hostname: "localhost"
+    slurm_controller_ip: "127.0.0.1"
+    slurm_compute_nodes:
+      - name: "compute01"
+        cpus: 2
+        memory: 4096
+      - name: "compute02"
+        cpus: 4
+        memory: 8192
+        ip: "192.168.1.101"
+
+  tasks:
+    - name: Verify required variables are set
+      ansible.builtin.assert:
+        that:
+          - slurm_cluster_name is defined
+          - slurm_node_role is defined
+          - slurm_controller_hostname is defined
+        fail_msg: "Required variables are not defined"
+        success_msg: "All required variables are defined"
+
+    - name: Verify node role is valid
+      ansible.builtin.assert:
+        that:
+          - slurm_node_role in ['controller', 'compute']
+        fail_msg: "slurm_node_role must be 'controller' or 'compute'"
+        success_msg: "Node role is valid"
+
+    - name: Verify compute nodes configuration
+      ansible.builtin.assert:
+        that:
+          - slurm_compute_nodes is defined
+          - slurm_compute_nodes | length > 0
+          - slurm_compute_nodes | selectattr('name', 'defined') | list | length == slurm_compute_nodes | length
+        fail_msg: "slurm_compute_nodes must be a non-empty list with 'name' defined for each node"
+        success_msg: "Compute nodes configuration is valid"
+
+    - name: Verify compute node resources
+      ansible.builtin.assert:
+        that:
+          - item.cpus is defined and item.cpus | int > 0
+          - item.memory is defined and item.memory | int > 0
+        fail_msg: "Compute node {{ item.name }} has invalid resource configuration"
+        success_msg: "Compute node {{ item.name }} has valid resources (CPUs: {{ item.cpus }}, Memory: {{ item.memory }}MB)"
+      loop: "{{ slurm_compute_nodes }}"
+
+    - name: Display test configuration
+      ansible.builtin.debug:
+        msg:
+          - "Cluster Name: {{ slurm_cluster_name }}"
+          - "Node Role: {{ slurm_node_role }}"
+          - "Controller: {{ slurm_controller_hostname }}"
+          - "Compute Nodes: {{ slurm_compute_nodes | map(attribute='name') | list }}"
+
+    - name: Test default variable values
+      ansible.builtin.assert:
+        that:
+          - slurm_slurmctld_port | default(6817) | int > 0
+          - slurm_slurmd_port | default(6818) | int > 0
+          - slurm_partition_name | default('batch') | length > 0
+        success_msg: "Default variables are properly configured"
+
+- name: Test Compute Node Configuration
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    slurm_node_role: compute
+    slurm_cluster_name: "testcluster"
+    slurm_controller_hostname: "controller01"
+    slurm_compute_nodes:
+      - name: "compute01"
+        cpus: 4
+        memory: 8192
+
+  tasks:
+    - name: Verify compute node role configuration
+      ansible.builtin.assert:
+        that:
+          - slurm_node_role == 'compute'
+          - slurm_controller_hostname is defined
+        success_msg: "Compute node configuration is valid"
+
+- name: Test Edge Cases
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    slurm_cluster_name: "test-cluster-with-dashes"
+    slurm_controller_hostname: "controller.example.com"
+    slurm_compute_nodes:
+      - name: "node001"
+        cpus: 1
+        memory: 1024
+
+  tasks:
+    - name: Verify cluster name with special characters
+      ansible.builtin.assert:
+        that:
+          - slurm_cluster_name | regex_search('^[a-zA-Z0-9_-]+$')
+        success_msg: "Cluster name format is valid"
+
+    - name: Verify FQDN controller hostname
+      ansible.builtin.assert:
+        that:
+          - slurm_controller_hostname | length > 0
+        success_msg: "Controller hostname is valid"

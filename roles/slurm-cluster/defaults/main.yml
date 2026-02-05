@@ -1,0 +1,236 @@
+---
+# defaults file for slurm-cluster
+
+# ==============================================
+# Cluster Configuration
+# ==============================================
+
+# Cluster name - used in slurm.conf
+slurm_cluster_name: "mycluster"
+
+# Node role: 'controller' or 'compute'
+# Set this per-host in your inventory
+slurm_node_role: "compute"
+
+# ==============================================
+# Controller Node Configuration
+# ==============================================
+
+# Controller (slurmctld) hostname - must be resolvable by all nodes
+slurm_controller_hostname: "slurm-controller"
+slurm_controller_ip: ""
+
+# Backup controller (optional)
+slurm_backup_controller_hostname: ""
+slurm_backup_controller_ip: ""
+
+# ==============================================
+# Compute Node Configuration
+# ==============================================
+
+# List of compute nodes with their specifications
+# Example:
+# slurm_compute_nodes:
+#   - name: "compute01"
+#     cpus: 4
+#     memory: 8192  # MB
+#     state: "UNKNOWN"
+slurm_compute_nodes:
+  - name: "compute01"
+    cpus: 4
+    memory: 8192
+    state: "UNKNOWN"
+
+# Default compute node resources (used if not specified per-node)
+slurm_default_cpus: 4
+slurm_default_memory: 8192
+slurm_default_state: "UNKNOWN"
+
+# ==============================================
+# Partition Configuration
+# ==============================================
+
+# Default partition name
+slurm_partition_name: "batch"
+
+# Partition settings
+slurm_partition_default: "YES"
+slurm_partition_max_time: "INFINITE"
+slurm_partition_state: "UP"
+
+# ==============================================
+# Shared Storage Configuration
+# ==============================================
+
+# Path to shared NFS storage (required for job data)
+slurm_shared_storage_path: "/shared"
+
+# NFS server for shared storage
+slurm_nfs_server: ""
+slurm_nfs_export: "/export/slurm"
+
+# Mount options for NFS
+slurm_nfs_mount_options: "rw,sync,hard,intr,nfsvers=4"
+
+# NFS connection timeout (seconds)
+slurm_nfs_timeout: 30
+
+# ==============================================
+# Slurm Directories
+# ==============================================
+
+# Slurm spool directory (must be local on each node)
+slurm_spool_dir: "/var/spool/slurm"
+
+# Slurm state directory (should be on shared storage for HA)
+slurm_state_dir: "/var/spool/slurmctld"
+
+# Slurm log directory
+slurm_log_dir: "/var/log/slurm"
+
+# Slurm PID directory
+slurm_pid_dir: "/run/slurm"
+
+# ==============================================
+# Authentication
+# ==============================================
+
+# Authentication mechanism (munge is standard)
+slurm_auth_type: "auth/munge"
+
+# Credential type (cred/none for basic setup, cred/munge for enhanced security)
+slurm_cred_type: "cred/none"
+
+# Munge key - should be the same across all nodes
+# Generate with: dd if=/dev/urandom bs=1 count=1024 | base64 -w0
+# Leave empty to auto-generate on controller and distribute
+slurm_munge_key: ""
+
+# ==============================================
+# Accounting (Optional)
+# ==============================================
+
+# Enable Slurm accounting
+slurm_accounting_enabled: false
+
+# Accounting storage type
+slurm_accounting_storage_type: "accounting_storage/none"
+
+# Database settings (if using slurmdbd)
+slurm_db_host: "localhost"
+slurm_db_name: "slurm_acct_db"
+slurm_db_user: "slurm"
+slurm_db_password: ""
+
+# ==============================================
+# Scheduler Configuration
+# ==============================================
+
+# Scheduler type
+slurm_scheduler_type: "sched/backfill"
+
+# Select type (how resources are allocated)
+slurm_select_type: "select/cons_tres"
+slurm_select_type_parameters: "CR_Core"
+
+# Scheduling parameters
+slurm_fast_schedule: 1
+
+# ==============================================
+# Resource Limits
+# ==============================================
+
+# Default memory per CPU (MB)
+slurm_def_mem_per_cpu: 1024
+
+# Maximum memory per CPU (MB) - 0 means unlimited
+slurm_max_mem_per_cpu: 0
+
+# Maximum job time (minutes) - 0 means unlimited
+slurm_max_time: 0
+
+# ==============================================
+# Process Tracking
+# ==============================================
+
+# Process tracking type
+slurm_proctrack_type: "proctrack/cgroup"
+
+# Task plugin
+slurm_task_plugin: "task/affinity,task/cgroup"
+
+# ==============================================
+# Logging
+# ==============================================
+
+# Log level: quiet, fatal, error, info, verbose, debug, debug2-5
+slurm_log_level: "info"
+
+# Slurmctld debug level
+slurm_slurmctld_debug: "info"
+
+# Slurmd debug level
+slurm_slurmd_debug: "info"
+
+# ==============================================
+# Timeouts
+# ==============================================
+
+# How often slurmctld checks node state (seconds)
+slurm_slurmctld_timeout: 120
+
+# How often slurmd sends heartbeat (seconds)
+slurm_slurmd_timeout: 300
+
+# Time before a DOWN node becomes available (seconds)
+slurm_return_to_service: 1
+
+# Additional timer settings
+slurm_inactive_limit: 0
+slurm_kill_wait: 30
+slurm_min_job_age: 300
+slurm_wait_time: 0
+
+# ==============================================
+# Ports
+# ==============================================
+
+# Slurmctld port
+slurm_slurmctld_port: 6817
+
+# Slurmd port
+slurm_slurmd_port: 6818
+
+# ==============================================
+# Package Installation
+# ==============================================
+
+# Ubuntu 24.04 packages
+slurm_common_packages:
+  - slurm-wlm
+  - slurm-client
+  - munge
+  - libmunge2
+
+slurm_controller_packages:
+  - slurmctld
+  - slurm-wlm-doc
+
+slurm_compute_packages:
+  - slurmd
+
+# Additional packages for cgroup support
+slurm_cgroup_packages:
+  - cgroup-tools
+
+# NFS client packages
+slurm_nfs_packages:
+  - nfs-common
+
+# ==============================================
+# Firewall Configuration
+# ==============================================
+
+# Enable automatic UFW firewall configuration
+# Set to true to automatically open required ports
+slurm_configure_firewall: false

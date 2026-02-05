@@ -1,0 +1,35 @@
+---
+galaxy_info:
+  author: Heath Provost
+  namespace: support
+  description: >-
+    Ansible role for deploying a two-node Slurm HPC cluster on Ubuntu 24.04.
+    Configures one controller node (slurmctld) and one compute node (slurmd)
+    with Munge authentication, cgroup resource management, and optional
+    NFS shared storage support.
+  company: ""
+
+  license: MIT
+
+  min_ansible_version: "2.9"
+
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble  # 24.04
+        - jammy  # 22.04
+
+  galaxy_tags:
+    - slurm
+    - hpc
+    - cluster
+    - scheduler
+    - workload
+    - ubuntu
+    - compute
+    - munge
+    - cgroup
+
+dependencies:
+  - ansible.posix
+  - community.general  # Required for UFW firewall module when slurm_configure_firewall=true

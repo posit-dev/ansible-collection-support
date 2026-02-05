@@ -1,0 +1,42 @@
+---
+# Handlers for slurm-cluster role
+
+- name: Restart munge
+  ansible.builtin.systemd:
+    name: munge
+    state: restarted
+  become: true
+
+- name: Restart slurmctld
+  ansible.builtin.systemd:
+    name: slurmctld
+    state: restarted
+  become: true
+  when: slurm_node_role == 'controller'
+
+- name: Restart slurmd
+  ansible.builtin.systemd:
+    name: slurmd
+    state: restarted
+  become: true
+  when: slurm_node_role == 'compute'
+
+- name: Reload slurmctld
+  ansible.builtin.systemd:
+    name: slurmctld
+    state: reloaded
+  become: true
+  when: slurm_node_role == 'controller'
+
+- name: Reload slurmd
+  ansible.builtin.systemd:
+    name: slurmd
+    state: reloaded
+  become: true
+  when: slurm_node_role == 'compute'
+
+- name: Reconfigure slurm
+  ansible.builtin.command: scontrol reconfigure
+  become: true
+  when: slurm_node_role == 'controller'
+  changed_when: true

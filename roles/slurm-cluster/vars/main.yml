@@ -1,0 +1,13 @@
+---
+# vars file for slurm-cluster
+# These variables are not intended to be overridden
+
+# Slurm service names
+slurm_controller_service: "slurmctld"
+slurm_compute_service: "slurmd"
+slurm_munge_service: "munge"
+
+# Configuration file paths
+slurm_conf_path: "/etc/slurm/slurm.conf"
+slurm_cgroup_conf_path: "/etc/slurm/cgroup.conf"
+munge_key_path: "/etc/munge/munge.key"

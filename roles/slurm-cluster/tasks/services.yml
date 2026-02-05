@@ -1,0 +1,93 @@
+---
+# Service management tasks for Slurm
+
+- name: Flush handlers before starting services
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start slurmctld on controller
+  ansible.builtin.systemd:
+    name: slurmctld
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true
+  when: slurm_node_role == 'controller'
+
+- name: Enable and start slurmd on compute nodes
+  ansible.builtin.systemd:
+    name: slurmd
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true
+  when: slurm_node_role == 'compute'
+
+- name: Wait for slurmctld to be available
+  ansible.builtin.wait_for:
+    port: "{{ slurm_slurmctld_port }}"
+    host: "{{ slurm_controller_hostname }}"
+    timeout: 60
+  when: slurm_node_role == 'controller'
+
+- name: Wait for slurmd to be available
+  ansible.builtin.wait_for:
+    port: "{{ slurm_slurmd_port }}"
+    host: "{{ inventory_hostname }}"
+    timeout: 60
+  when: slurm_node_role == 'compute'
+
+# Controller health checks
+- name: Verify slurmctld service status
+  ansible.builtin.command: systemctl is-active slurmctld
+  register: slurm_slurmctld_service_status
+  changed_when: false
+  failed_when: slurm_slurmctld_service_status.rc != 0
+  when: slurm_node_role == 'controller'
+
+- name: Verify cluster status on controller
+  ansible.builtin.command: sinfo
+  register: slurm_cluster_status
+  changed_when: false
+  become: true
+  when: slurm_node_role == 'controller'
+
+- name: Display cluster status
+  ansible.builtin.debug:
+    var: slurm_cluster_status.stdout_lines
+  when: slurm_node_role == 'controller' and slurm_cluster_status is defined
+
+# Compute node health checks
+- name: Verify slurmd service status
+  ansible.builtin.command: systemctl is-active slurmd
+  register: slurm_slurmd_service_status
+  changed_when: false
+  failed_when: slurm_slurmd_service_status.rc != 0
+  when: slurm_node_role == 'compute'
+
+- name: Get compute node configuration
+  ansible.builtin.command: slurmd -C
+  register: slurm_compute_config
+  changed_when: false
+  become: true
+  when: slurm_node_role == 'compute'
+
+- name: Display compute node configuration
+  ansible.builtin.debug:
+    msg: "Node {{ inventory_hostname }} resources: {{ slurm_compute_config.stdout }}"
+  when: slurm_node_role == 'compute' and slurm_compute_config is defined
+
+- name: Verify controller connectivity from compute node
+  ansible.builtin.wait_for:
+    host: "{{ slurm_controller_hostname }}"
+    port: "{{ slurm_slurmctld_port }}"
+    timeout: 30
+    state: started
+  when: slurm_node_role == 'compute'
+
+- name: Test Slurm communication from compute node
+  ansible.builtin.command: scontrol ping
+  register: slurm_ping_result
+  changed_when: false
+  failed_when: "'UP' not in slurm_ping_result.stdout"
+  become: true
+  when: slurm_node_role == 'compute'

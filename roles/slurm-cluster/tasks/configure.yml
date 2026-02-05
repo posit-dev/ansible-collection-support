@@ -1,0 +1,55 @@
+---
+# Configuration tasks for Slurm
+
+- name: Create Slurm configuration directory
+  ansible.builtin.file:
+    path: /etc/slurm
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
+
+- name: Deploy slurm.conf
+  ansible.builtin.template:
+    src: slurm.conf.j2
+    dest: /etc/slurm/slurm.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify:
+    - Restart slurmctld
+    - Restart slurmd
+
+- name: Deploy cgroup.conf
+  ansible.builtin.template:
+    src: cgroup.conf.j2
+    dest: /etc/slurm/cgroup.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify:
+    - Restart slurmctld
+    - Restart slurmd
+
+- name: Deploy cgroup_allowed_devices_file.conf
+  ansible.builtin.template:
+    src: cgroup_allowed_devices_file.conf.j2
+    dest: /etc/slurm/cgroup_allowed_devices_file.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify:
+    - Restart slurmctld
+    - Restart slurmd
+
+- name: Validate slurm.conf syntax
+  ansible.builtin.command: slurmctld -t
+  register: slurm_config_check
+  changed_when: false
+  failed_when: slurm_config_check.rc != 0
+  become: true
+  when: slurm_node_role == 'controller'

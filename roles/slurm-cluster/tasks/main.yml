@@ -1,0 +1,46 @@
+---
+# Main tasks file for slurm-cluster
+
+- name: Validate required variables
+  ansible.builtin.assert:
+    that:
+      - slurm_cluster_name is defined and slurm_cluster_name | length > 0
+      - slurm_node_role in ['controller', 'compute']
+      - slurm_controller_hostname is defined and slurm_controller_hostname | length > 0
+    fail_msg: "Required Slurm cluster variables are not properly defined"
+    success_msg: "Slurm cluster configuration validated"
+
+- name: Validate compute nodes configuration
+  ansible.builtin.assert:
+    that:
+      - slurm_compute_nodes is defined
+      - slurm_compute_nodes | length > 0
+      - slurm_compute_nodes | selectattr('name', 'defined') | list | length == slurm_compute_nodes | length
+    fail_msg: "slurm_compute_nodes must be a non-empty list with 'name' defined for each node"
+    success_msg: "Compute nodes configuration validated"
+
+- name: Validate Munge key format if provided
+  ansible.builtin.assert:
+    that:
+      - slurm_munge_key | b64decode | length >= 128
+    fail_msg: "Provided Munge key is too short (minimum 128 bytes after base64 decode)"
+    success_msg: "Munge key format validated"
+  when: slurm_munge_key | length > 0
+  no_log: true
+
+- name: Include common setup tasks
+  ansible.builtin.include_tasks: common.yml
+
+- name: Include controller-specific tasks
+  ansible.builtin.include_tasks: controller.yml
+  when: slurm_node_role == 'controller'
+
+- name: Include compute node tasks
+  ansible.builtin.include_tasks: compute.yml
+  when: slurm_node_role == 'compute'
+
+- name: Include configuration tasks
+  ansible.builtin.include_tasks: configure.yml
+
+- name: Include service startup tasks
+  ansible.builtin.include_tasks: services.yml

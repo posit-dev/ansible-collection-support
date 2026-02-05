@@ -1,0 +1,16 @@
+# Test inventory for slurm-cluster role
+#
+# Example two-node cluster inventory:
+#
+# [slurm_controller]
+# controller01 ansible_host=10.0.0.10 slurm_node_role=controller
+#
+# [slurm_compute]
+# compute01 ansible_host=10.0.0.11 slurm_node_role=compute
+#
+# [slurm_cluster:children]
+# slurm_controller
+# slurm_compute
+
+[local]
+localhost ansible_connection=local

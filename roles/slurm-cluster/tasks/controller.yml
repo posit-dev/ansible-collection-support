@@ -1,0 +1,128 @@
+---
+# Controller (slurmctld) specific tasks
+
+- name: Install controller packages
+  ansible.builtin.apt:
+    name: "{{ slurm_controller_packages }}"
+    state: present
+  become: true
+
+- name: Create slurmctld state directory
+  ansible.builtin.file:
+    path: "{{ slurm_state_dir }}"
+    state: directory
+    owner: slurm
+    group: slurm
+    mode: "0755"
+  become: true
+
+- name: Check if Munge key already exists
+  ansible.builtin.stat:
+    path: /etc/munge/munge.key
+  register: slurm_existing_munge_key
+  become: true
+
+- name: Read existing Munge key if present and no key provided
+  ansible.builtin.slurp:
+    src: /etc/munge/munge.key
+  register: slurm_existing_munge_key_content
+  become: true
+  when:
+    - slurm_munge_key | length == 0
+    - slurm_existing_munge_key.stat.exists
+  no_log: true
+
+- name: Generate Munge key if not provided and not existing
+  ansible.builtin.shell: |
+    set -o pipefail
+    dd if=/dev/urandom bs=1 count=1024 2>/dev/null | base64 -w0
+  args:
+    executable: /bin/bash
+  register: slurm_generated_munge_key
+  when:
+    - slurm_munge_key | length == 0
+    - not slurm_existing_munge_key.stat.exists
+  changed_when: false
+  no_log: true
+
+- name: Validate generated Munge key
+  ansible.builtin.assert:
+    that:
+      - slurm_generated_munge_key.stdout is defined
+      - slurm_generated_munge_key.stdout | length > 0
+      - slurm_generated_munge_key.rc == 0
+    fail_msg: "Failed to generate Munge key - check /dev/urandom availability"
+    success_msg: "Munge key generated successfully"
+  when:
+    - slurm_munge_key | length == 0
+    - not slurm_existing_munge_key.stat.exists
+
+- name: Set Munge key fact (user-provided)
+  ansible.builtin.set_fact:
+    slurm_actual_munge_key: "{{ slurm_munge_key }}"
+  no_log: true
+  when: slurm_munge_key | length > 0
+
+- name: Set Munge key fact (existing)
+  ansible.builtin.set_fact:
+    slurm_actual_munge_key: "{{ slurm_existing_munge_key_content.content }}"
+  no_log: true
+  when:
+    - slurm_munge_key | length == 0
+    - slurm_existing_munge_key.stat.exists
+
+- name: Set Munge key fact (newly generated)
+  ansible.builtin.set_fact:
+    slurm_actual_munge_key: "{{ slurm_generated_munge_key.stdout }}"
+  no_log: true
+  when:
+    - slurm_munge_key | length == 0
+    - not slurm_existing_munge_key.stat.exists
+
+- name: Deploy Munge key
+  ansible.builtin.copy:
+    content: "{{ slurm_actual_munge_key | b64decode }}"
+    dest: /etc/munge/munge.key
+    owner: munge
+    group: munge
+    mode: "0400"
+  become: true
+  notify: Restart munge
+  no_log: true
+
+- name: Store Munge key for distribution to compute nodes
+  ansible.builtin.set_fact:
+    slurm_cluster_munge_key: "{{ slurm_actual_munge_key }}"
+  delegate_to: localhost
+  delegate_facts: true
+  no_log: true
+
+- name: Enable and start Munge service
+  ansible.builtin.systemd:
+    name: munge
+    enabled: true
+    state: started
+  become: true
+
+- name: Verify Munge service is running
+  ansible.builtin.command: systemctl is-active munge
+  register: slurm_munge_status
+  changed_when: false
+  failed_when: slurm_munge_status.rc != 0
+
+- name: Test Munge authentication
+  ansible.builtin.command: munge -n
+  register: slurm_munge_test
+  changed_when: false
+  failed_when: slurm_munge_test.rc != 0
+  become: true
+  become_user: munge
+
+- name: Create cgroup configuration directory
+  ansible.builtin.file:
+    path: /etc/slurm
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  become: true
