@@ -7,9 +7,11 @@ Ansible role for deploying [Semaphore UI](https://semaphoreui.com/) using Podman
 - [Description](#description)
 - [Requirements](#requirements)
 - [Role Variables](#role-variables)
+  - [Token Persistence](#token-persistence)
 - [Task Tags](#task-tags)
 - [Handlers](#handlers)
 - [Examples](#examples)
+  - [Setup with API Token Persistence](#setup-with-api-token-persistence)
 - [Idempotency](#idempotency)
 - [Testing](#testing)
 - [Troubleshooting](#troubleshooting)
@@ -118,6 +120,24 @@ Each user in the list requires:
 - `password`: User password
 - `admin`: (optional) Whether user is admin (default: false)
 
+### Token Persistence
+
+Save the generated API token to an Ansible vault file for use in other playbooks.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `semaphore_save_api_token` | `false` | Enable token persistence |
+| `semaphore_api_token_vault_file` | `{{ playbook_dir }}/secrets/vault.yml` | Vault file path |
+| `semaphore_vault_password_file` | `""` | Vault password file path |
+
+**Note:** The vault file must already exist before running the role. Create it with:
+
+```bash
+mkdir -p secrets
+ansible-vault create secrets/vault.yml --vault-password-file .vault_pass
+# Add initial content: semaphore_api_token: ""
+```
+
 ### API Settings
 
 | Variable | Default | Description |
@@ -192,6 +212,37 @@ The role provides handlers for container lifecycle management:
             email: "jsmith@example.com"
             password: "{{ vault_jsmith_pass }}"
             admin: true
+```
+
+### Setup with API Token Persistence
+
+Save the API token to an encrypted vault file for use in other playbooks:
+
+```yaml
+- name: Deploy Semaphore with token persistence
+  hosts: localhost
+  roles:
+    - role: semaphore_ui
+      vars:
+        semaphore_admin_password: "MySecurePassword123"
+        semaphore_save_api_token: true
+        semaphore_vault_password_file: ".vault_pass"
+```
+
+Then use the token in other playbooks:
+
+```yaml
+- name: Use Semaphore API
+  hosts: localhost
+  vars_files:
+    - secrets/vault.yml
+  tasks:
+    - name: List projects
+      ansible.builtin.uri:
+        url: "http://localhost:3000/api/projects"
+        headers:
+          Authorization: "Bearer {{ semaphore_api_token }}"
+      register: projects
 ```
 
 ### Container-Only Setup (No Project)

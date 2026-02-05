@@ -1,0 +1,21 @@
+# Secrets directory - plain text tokens and sensitive data
+secrets/*
+# Allow encrypted vault files to be committed
+!secrets/*.yml
+# Allow README documentation
+!secrets/README.md
+
+# Ansible retry files
+*.retry
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Editor files
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store

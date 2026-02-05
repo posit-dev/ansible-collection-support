@@ -161,6 +161,52 @@
       ansible.builtin.set_fact:
         _semaphore_api_token: "{{ token_response.json.id }}"
       no_log: true
+
+    - name: Save API token to vault file
+      when: semaphore_save_api_token | bool
+      block:
+        - name: Build vault password file argument
+          ansible.builtin.set_fact:
+            _vault_pass_arg: "{{ '--vault-password-file ' + semaphore_vault_password_file if semaphore_vault_password_file | length > 0 else '' }}"
+
+        - name: Decrypt vault file
+          ansible.builtin.command:
+            cmd: "ansible-vault decrypt {{ _vault_pass_arg }} {{ semaphore_api_token_vault_file }}"
+          delegate_to: localhost
+          no_log: true
+          changed_when: true
+
+        - name: Read decrypted vault file
+          ansible.builtin.slurp:
+            src: "{{ semaphore_api_token_vault_file }}"
+          register: _vault_content
+          delegate_to: localhost
+          no_log: true
+
+        - name: Parse vault content
+          ansible.builtin.set_fact:
+            _vault_data: "{{ _vault_content.content | b64decode | from_yaml }}"
+          no_log: true
+
+        - name: Update vault data with new token
+          ansible.builtin.set_fact:
+            _vault_data_updated: "{{ _vault_data | combine({'semaphore_api_token': _semaphore_api_token}) }}"
+          no_log: true
+
+        - name: Write updated vault file
+          ansible.builtin.copy:
+            content: "{{ _vault_data_updated | to_nice_yaml }}"
+            dest: "{{ semaphore_api_token_vault_file }}"
+            mode: '0600'
+          delegate_to: localhost
+          no_log: true
+
+        - name: Re-encrypt vault file
+          ansible.builtin.command:
+            cmd: "ansible-vault encrypt {{ _vault_pass_arg }} {{ semaphore_api_token_vault_file }}"
+          delegate_to: localhost
+          no_log: true
+          changed_when: true
   rescue:
     - name: Authentication failed
       ansible.builtin.fail:
@@ -454,6 +500,8 @@
       - "Repository: {{ semaphore_repository_name }} (ID: {{ _semaphore_repository_id | default('N/A') }}){{ ' [created]' if (_semaphore_repository_created | default(false)) else ' [existing]' }}"
       - ""
       - "Additional users configured: {{ semaphore_additional_users | length }}"
+      - ""
+      - "API Token: {{ 'Saved to vault ' + semaphore_api_token_vault_file if (semaphore_save_api_token | bool) else 'Not saved (set semaphore_save_api_token=true to persist)' }}"
   when: semaphore_create_project | bool
   tags:
     - semaphore

@@ -125,6 +125,21 @@ semaphore_repository_path: "/git"
 semaphore_additional_users: []
 
 # ==============================================
+# Token Persistence (Optional)
+# ==============================================
+
+# Whether to save the API token for use in other playbooks
+semaphore_save_api_token: false
+
+# Path to the vault file for storing the API token
+# The file must already exist (created with ansible-vault create)
+semaphore_api_token_vault_file: "{{ playbook_dir }}/secrets/vault.yml"
+
+# Vault password file path (required when semaphore_save_api_token is true)
+# Can also use --vault-password-file on command line or ANSIBLE_VAULT_PASSWORD_FILE env var
+semaphore_vault_password_file: ""
+
+# ==============================================
 # API Settings
 # ==============================================
 
