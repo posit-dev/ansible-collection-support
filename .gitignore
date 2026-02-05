@@ -1,7 +1,5 @@
-# Secrets directory - plain text tokens and sensitive data
+# Secrets directory - tokens and sensitive data
 secrets/*
-# Allow encrypted vault files to be committed
-!secrets/*.yml
 # Allow README documentation
 !secrets/README.md
 
