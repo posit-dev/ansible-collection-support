@@ -199,9 +199,48 @@ When `slurm_configure_firewall` is set to `true`, the role will automatically:
 | `slurm_package_install_retries` | Package installation retry attempts | `3` |
 | `slurm_package_install_retry_delay` | Delay between retries (seconds) | `5` |
 
+### Pre-flight Check Settings
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `slurm_min_spool_disk_mb` | Minimum disk space for spool directory (MB) | `1024` |
+| `slurm_min_log_disk_mb` | Minimum disk space for log directory (MB) | `512` |
+| `slurm_preflight_connect_timeout` | Timeout for connectivity checks (seconds) | `10` |
+
+### Log Rotation
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `slurm_logrotate_enabled` | Enable logrotate configuration | `true` |
+| `slurm_logrotate_frequency` | Rotation frequency (daily/weekly/monthly) | `daily` |
+| `slurm_logrotate_rotate` | Number of rotated logs to keep | `7` |
+| `slurm_logrotate_compress` | Compress rotated logs | `true` |
+
 ### Full Variable Reference
 
 See [defaults/main.yml](defaults/main.yml) for all available variables.
+
+## Task Tags
+
+The role supports the following tags for selective execution:
+
+| Tag | Description |
+|-----|-------------|
+| `slurm` | All Slurm tasks |
+| `slurm_validate` | Variable validation only |
+| `slurm_preflight` | Pre-flight system checks |
+| `slurm_install` | Package installation |
+| `slurm_controller` | Controller-specific tasks |
+| `slurm_compute` | Compute node tasks |
+| `slurm_munge` | Munge authentication tasks |
+| `slurm_config` | Configuration deployment |
+| `slurm_services` | Service management |
+| `slurm_verify` | Health verification |
+
+Example: Run only configuration tasks:
+```bash
+ansible-playbook site.yml --tags slurm_config
+```
 
 ## Example Inventory
 
@@ -312,6 +351,17 @@ For proper NFS operation, ensure the slurm user has the same UID/GID across all 
 slurm_user_uid: 64030
 slurm_user_gid: 64030
 ```
+
+## Pre-flight Checks
+
+Before installation, the role performs the following system checks:
+
+- **Cgroup filesystem**: Verifies `/sys/fs/cgroup` is mounted
+- **Cgroup version detection**: Detects v1 or v2 (unified) hierarchy
+- **Disk space**: Ensures sufficient space for spool and log directories
+- **Network connectivity**: Compute nodes verify controller is reachable
+- **Systemd availability**: Confirms systemd is available
+- **OS compatibility**: Verifies Ubuntu 22.04 or later
 
 ## Automatic Health Checks
 

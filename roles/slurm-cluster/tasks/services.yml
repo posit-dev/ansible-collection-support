@@ -6,7 +6,7 @@
 
 - name: Enable and start slurmctld on controller
   ansible.builtin.systemd:
-    name: slurmctld
+    name: "{{ slurm_controller_service }}"
     enabled: true
     state: started
     daemon_reload: true
@@ -15,7 +15,7 @@
 
 - name: Enable and start slurmd on compute nodes
   ansible.builtin.systemd:
-    name: slurmd
+    name: "{{ slurm_compute_service }}"
     enabled: true
     state: started
     daemon_reload: true
@@ -38,7 +38,7 @@
 
 # Controller health checks
 - name: Verify slurmctld service status
-  ansible.builtin.command: systemctl is-active slurmctld
+  ansible.builtin.command: "systemctl is-active {{ slurm_controller_service }}"
   register: slurm_slurmctld_service_status
   changed_when: false
   failed_when: slurm_slurmctld_service_status.rc != 0
@@ -61,7 +61,7 @@
 
 # Compute node health checks
 - name: Verify slurmd service status
-  ansible.builtin.command: systemctl is-active slurmd
+  ansible.builtin.command: "systemctl is-active {{ slurm_compute_service }}"
   register: slurm_slurmd_service_status
   changed_when: false
   failed_when: slurm_slurmd_service_status.rc != 0

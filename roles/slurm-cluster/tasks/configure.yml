@@ -10,10 +10,10 @@
     mode: "0755"
   become: true
 
-- name: Deploy slurm.conf
+- name: Deploy slurm.conf on controller
   ansible.builtin.template:
     src: slurm.conf.j2
-    dest: /etc/slurm/slurm.conf
+    dest: "{{ slurm_conf_path }}"
     owner: root
     group: root
     mode: "0644"
@@ -26,19 +26,39 @@
 - name: Deploy slurm.conf on compute nodes
   ansible.builtin.template:
     src: slurm.conf.j2
-    dest: /etc/slurm/slurm.conf
+    dest: "{{ slurm_conf_path }}"
     owner: root
     group: root
     mode: "0644"
   become: true
+  register: slurm_compute_conf_deployed
   notify:
     - Restart slurmd
   when: slurm_node_role == 'compute'
 
+- name: Validate slurm.conf on compute nodes
+  ansible.builtin.command: "grep -q '^ClusterName=' {{ slurm_conf_path }}"
+  become: true
+  changed_when: false
+  failed_when: false
+  register: slurm_compute_conf_check
+  when:
+    - slurm_node_role == 'compute'
+    - slurm_compute_conf_deployed is changed
+
+- name: Fail if slurm.conf is invalid on compute node
+  ansible.builtin.fail:
+    msg: "slurm.conf validation failed on compute node - missing ClusterName directive"
+  when:
+    - slurm_node_role == 'compute'
+    - slurm_compute_conf_check is defined
+    - slurm_compute_conf_check.rc is defined
+    - slurm_compute_conf_check.rc != 0
+
 - name: Deploy cgroup.conf
   ansible.builtin.template:
     src: cgroup.conf.j2
-    dest: /etc/slurm/cgroup.conf
+    dest: "{{ slurm_cgroup_conf_path }}"
     owner: root
     group: root
     mode: "0644"
@@ -58,3 +78,13 @@
   notify:
     - Restart slurmctld
     - Restart slurmd
+
+- name: Deploy logrotate configuration
+  ansible.builtin.template:
+    src: slurm-logrotate.j2
+    dest: /etc/logrotate.d/slurm
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  when: slurm_logrotate_enabled | bool

@@ -7,7 +7,7 @@
 
 - name: Restart munge
   ansible.builtin.systemd:
-    name: munge
+    name: "{{ slurm_munge_service }}"
     state: restarted
   become: true
   listen: "restart authentication"
@@ -22,7 +22,7 @@
 
 - name: Restart slurmctld
   ansible.builtin.systemd:
-    name: slurmctld
+    name: "{{ slurm_controller_service }}"
     state: restarted
   become: true
   when: slurm_node_role == 'controller'
@@ -30,7 +30,7 @@
 
 - name: Restart slurmd
   ansible.builtin.systemd:
-    name: slurmd
+    name: "{{ slurm_compute_service }}"
     state: restarted
   become: true
   when: slurm_node_role == 'compute'
@@ -38,7 +38,7 @@
 
 - name: Reload slurmctld
   ansible.builtin.systemd:
-    name: slurmctld
+    name: "{{ slurm_controller_service }}"
     state: reloaded
   become: true
   when: slurm_node_role == 'controller'
@@ -46,7 +46,7 @@
 
 - name: Reload slurmd
   ansible.builtin.systemd:
-    name: slurmd
+    name: "{{ slurm_compute_service }}"
     state: reloaded
   become: true
   when: slurm_node_role == 'compute'

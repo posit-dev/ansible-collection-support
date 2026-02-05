@@ -1,0 +1,91 @@
+---
+# Pre-flight system checks for Slurm cluster deployment
+
+- name: Verify cgroup filesystem is mounted
+  ansible.builtin.stat:
+    path: /sys/fs/cgroup
+  register: slurm_cgroup_fs
+  failed_when: not slurm_cgroup_fs.stat.exists or not slurm_cgroup_fs.stat.isdir
+
+- name: Detect cgroup version
+  ansible.builtin.stat:
+    path: /sys/fs/cgroup/cgroup.controllers
+  register: slurm_cgroup_v2_check
+
+- name: Set cgroup version fact
+  ansible.builtin.set_fact:
+    slurm_cgroup_version: "{{ 'v2' if slurm_cgroup_v2_check.stat.exists else 'v1' }}"
+
+- name: Display cgroup version
+  ansible.builtin.debug:
+    msg: "Detected cgroup version: {{ slurm_cgroup_version }}"
+
+- name: Warn about cgroup v2 compatibility
+  ansible.builtin.debug:
+    msg: >
+      WARNING: cgroup v2 (unified hierarchy) detected. Ensure your Slurm version
+      supports cgroup v2. Slurm 21.08+ is recommended for cgroup v2 support.
+  when: slurm_cgroup_version == 'v2'
+
+- name: Check available disk space for spool directory
+  ansible.builtin.shell: |
+    set -o pipefail
+    df -BM "{{ slurm_spool_dir | dirname }}" | tail -1 | awk '{print $4}' | tr -d 'M'
+  args:
+    executable: /bin/bash
+  register: slurm_spool_disk_space
+  changed_when: false
+  failed_when: false
+
+- name: Verify sufficient disk space for spool directory
+  ansible.builtin.assert:
+    that:
+      - slurm_spool_disk_space.stdout | int >= slurm_min_spool_disk_mb | int
+    fail_msg: >
+      Insufficient disk space for spool directory. Available: {{ slurm_spool_disk_space.stdout }}MB,
+      Required: {{ slurm_min_spool_disk_mb }}MB. Path: {{ slurm_spool_dir }}
+    success_msg: "Sufficient disk space for spool directory ({{ slurm_spool_disk_space.stdout }}MB available)"
+  when: slurm_spool_disk_space.rc == 0
+
+- name: Check available disk space for log directory
+  ansible.builtin.shell: |
+    set -o pipefail
+    df -BM "{{ slurm_log_dir | dirname }}" | tail -1 | awk '{print $4}' | tr -d 'M'
+  args:
+    executable: /bin/bash
+  register: slurm_log_disk_space
+  changed_when: false
+  failed_when: false
+
+- name: Verify sufficient disk space for log directory
+  ansible.builtin.assert:
+    that:
+      - slurm_log_disk_space.stdout | int >= slurm_min_log_disk_mb | int
+    fail_msg: >
+      Insufficient disk space for log directory. Available: {{ slurm_log_disk_space.stdout }}MB,
+      Required: {{ slurm_min_log_disk_mb }}MB. Path: {{ slurm_log_dir }}
+    success_msg: "Sufficient disk space for log directory ({{ slurm_log_disk_space.stdout }}MB available)"
+  when: slurm_log_disk_space.rc == 0
+
+- name: Verify controller connectivity from compute node
+  ansible.builtin.wait_for:
+    host: "{{ slurm_controller_ip | default(slurm_controller_hostname, true) }}"
+    port: 22
+    timeout: "{{ slurm_preflight_connect_timeout }}"
+    state: started
+  when: slurm_node_role == 'compute'
+
+- name: Check if systemd is available
+  ansible.builtin.command: systemctl --version
+  register: slurm_systemd_check
+  changed_when: false
+  failed_when: slurm_systemd_check.rc != 0
+
+- name: Verify Ubuntu version compatibility
+  ansible.builtin.assert:
+    that:
+      - ansible_distribution == 'Ubuntu'
+      - ansible_distribution_version is version('22.04', '>=')
+    fail_msg: >
+      This role requires Ubuntu 22.04 or later. Detected: {{ ansible_distribution }} {{ ansible_distribution_version }}
+    success_msg: "OS version compatible: {{ ansible_distribution }} {{ ansible_distribution_version }}"

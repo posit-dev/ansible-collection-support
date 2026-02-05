@@ -9,6 +9,9 @@
       - slurm_controller_hostname is defined and slurm_controller_hostname | length > 0
     fail_msg: "Required Slurm cluster variables are not properly defined"
     success_msg: "Slurm cluster configuration validated"
+  tags:
+    - slurm
+    - slurm_validate
 
 - name: Validate compute nodes configuration
   ansible.builtin.assert:
@@ -18,6 +21,9 @@
       - slurm_compute_nodes | selectattr('name', 'defined') | list | length == slurm_compute_nodes | length
     fail_msg: "slurm_compute_nodes must be a non-empty list with 'name' defined for each node"
     success_msg: "Compute nodes configuration validated"
+  tags:
+    - slurm
+    - slurm_validate
 
 - name: Validate Munge key format if provided
   ansible.builtin.assert:
@@ -27,20 +33,48 @@
     success_msg: "Munge key format validated"
   when: slurm_munge_key | length > 0
   no_log: true
+  tags:
+    - slurm
+    - slurm_validate
+    - slurm_munge
+
+- name: Include pre-flight checks
+  ansible.builtin.include_tasks: preflight.yml
+  tags:
+    - slurm
+    - slurm_preflight
 
 - name: Include common setup tasks
   ansible.builtin.include_tasks: common.yml
+  tags:
+    - slurm
+    - slurm_install
 
 - name: Include controller-specific tasks
   ansible.builtin.include_tasks: controller.yml
   when: slurm_node_role == 'controller'
+  tags:
+    - slurm
+    - slurm_controller
+    - slurm_munge
 
 - name: Include compute node tasks
   ansible.builtin.include_tasks: compute.yml
   when: slurm_node_role == 'compute'
+  tags:
+    - slurm
+    - slurm_compute
+    - slurm_munge
 
 - name: Include configuration tasks
   ansible.builtin.include_tasks: configure.yml
+  tags:
+    - slurm
+    - slurm_config
 
 - name: Include service startup tasks
   ansible.builtin.include_tasks: services.yml
+  tags:
+    - slurm
+    - slurm_services
+    - slurm_verify

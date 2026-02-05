@@ -301,3 +301,32 @@ slurm_user_uid: ""
 
 # Slurm system group GID
 slurm_user_gid: ""
+
+# ==============================================
+# Pre-flight Check Settings
+# ==============================================
+
+# Minimum disk space required for spool directory (MB)
+slurm_min_spool_disk_mb: 1024
+
+# Minimum disk space required for log directory (MB)
+slurm_min_log_disk_mb: 512
+
+# Timeout for pre-flight connectivity checks (seconds)
+slurm_preflight_connect_timeout: 10
+
+# ==============================================
+# Log Rotation
+# ==============================================
+
+# Enable logrotate configuration for Slurm logs
+slurm_logrotate_enabled: true
+
+# Log rotation frequency: daily, weekly, monthly
+slurm_logrotate_frequency: "daily"
+
+# Number of rotated logs to keep
+slurm_logrotate_rotate: 7
+
+# Compress rotated logs
+slurm_logrotate_compress: true
