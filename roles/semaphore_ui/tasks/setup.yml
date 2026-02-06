@@ -111,14 +111,82 @@
             - Database initialization failed
 
 # ==============================================
-# Authentication
+# Authentication and Token Management
 # ==============================================
 
-- name: Authenticate to Semaphore API
+- name: Manage API token
   tags:
     - semaphore
     - semaphore_setup
   block:
+    # Check for existing token in vault first
+    - name: Check for existing API token in vault
+      when: semaphore_save_api_token | bool
+      block:
+        - name: Build vault password file argument
+          ansible.builtin.set_fact:
+            _vault_pass_arg: "{{ '--vault-password-file ' + semaphore_vault_password_file if semaphore_vault_password_file | length > 0 else '' }}"
+
+        - name: Check if vault file exists
+          ansible.builtin.stat:
+            path: "{{ semaphore_api_token_vault_file }}"
+          register: _vault_file_stat
+          delegate_to: localhost
+
+        - name: Load existing token from vault
+          when: _vault_file_stat.stat.exists
+          block:
+            - name: Decrypt vault file for reading
+              ansible.builtin.command:
+                cmd: "ansible-vault decrypt {{ _vault_pass_arg }} {{ semaphore_api_token_vault_file }}"
+              delegate_to: localhost
+              no_log: true
+              changed_when: true
+
+            - name: Read vault file contents
+              ansible.builtin.slurp:
+                src: "{{ semaphore_api_token_vault_file }}"
+              register: _vault_content_check
+              delegate_to: localhost
+              no_log: true
+
+            - name: Parse vault content for token check
+              ansible.builtin.set_fact:
+                _vault_data: "{{ _vault_content_check.content | b64decode | from_yaml | default({}) }}"
+              no_log: true
+
+            - name: Re-encrypt vault file after reading
+              ansible.builtin.command:
+                cmd: "ansible-vault encrypt {{ _vault_pass_arg }} {{ semaphore_api_token_vault_file }}"
+              delegate_to: localhost
+              no_log: true
+              changed_when: true
+
+            - name: Check if token exists and is not blank
+              ansible.builtin.set_fact:
+                _existing_token_valid: "{{ (_vault_data.semaphore_api_token | default('', true) | string | trim | length) > 0 and (_vault_data.semaphore_api_token | default('', true) | string) != 'None' }}"
+                _existing_api_token: "{{ _vault_data.semaphore_api_token | default('', true) }}"
+              no_log: true
+
+            - name: Use existing token from vault
+              ansible.builtin.set_fact:
+                _semaphore_api_token: "{{ _existing_api_token }}"
+                _token_from_vault: true
+              when: _existing_token_valid | bool
+              no_log: true
+
+            - name: Debug - token loaded from vault
+              ansible.builtin.debug:
+                msg: "Using existing API token from vault file"
+              when: _existing_token_valid | bool
+
+    # Set default for token tracking flags
+    - name: Initialize token tracking flags
+      ansible.builtin.set_fact:
+        _token_from_vault: "{{ _token_from_vault | default(false) }}"
+        _need_new_token: "{{ _semaphore_api_token is not defined }}"
+
+    # Only authenticate and create new token if we don't have a valid one
     - name: Authenticate and get session cookie
       ansible.builtin.uri:
         url: "{{ semaphore_api_url }}{{ _semaphore_endpoints.login }}"
@@ -135,13 +203,15 @@
       retries: "{{ semaphore_api_retries }}"
       delay: "{{ semaphore_api_retry_delay }}"
       until: auth_response.status in _semaphore_success_codes
+      when: _need_new_token | bool
 
     - name: Extract session cookie
       ansible.builtin.set_fact:
         _semaphore_session_cookie: "{{ auth_response.cookies_string }}"
       no_log: true
+      when: _need_new_token | bool
 
-    - name: Create API token
+    - name: Create API token via API
       ansible.builtin.uri:
         url: "{{ semaphore_api_url }}{{ _semaphore_endpoints.tokens }}"
         method: POST
@@ -156,70 +226,107 @@
       retries: "{{ semaphore_api_retries }}"
       delay: "{{ semaphore_api_retry_delay }}"
       until: token_response.status in _semaphore_success_codes
+      when: _need_new_token | bool
 
-    - name: Set API token fact
+    - name: Set API token fact from new token
       ansible.builtin.set_fact:
         _semaphore_api_token: "{{ token_response.json.id }}"
       no_log: true
+      when: _need_new_token | bool
 
-    - name: Save API token to vault file
-      when: semaphore_save_api_token | bool
-      block:
-        - name: Build vault password file argument
-          ansible.builtin.set_fact:
-            _vault_pass_arg: "{{ '--vault-password-file ' + semaphore_vault_password_file if semaphore_vault_password_file | length > 0 else '' }}"
+    - name: Debug - new token created
+      ansible.builtin.debug:
+        msg: "Created new API token"
+      when: _need_new_token | bool
 
-        - name: Decrypt vault file
-          ansible.builtin.command:
-            cmd: "ansible-vault decrypt {{ _vault_pass_arg }} {{ semaphore_api_token_vault_file }}"
-          delegate_to: localhost
-          no_log: true
-          changed_when: true
+    # Save newly created token to vault
+    - name: Ensure vault password argument is set for saving
+      ansible.builtin.set_fact:
+        _vault_pass_arg: "{{ '--vault-password-file ' + semaphore_vault_password_file if semaphore_vault_password_file | length > 0 else '' }}"
+      when:
+        - _need_new_token | bool
+        - semaphore_save_api_token | bool
+        - _vault_pass_arg is not defined
 
-        - name: Read decrypted vault file
-          ansible.builtin.slurp:
-            src: "{{ semaphore_api_token_vault_file }}"
-          register: _vault_content
-          delegate_to: localhost
-          no_log: true
+    - name: Decrypt vault file for update
+      ansible.builtin.command:
+        cmd: "ansible-vault decrypt {{ _vault_pass_arg }} {{ semaphore_api_token_vault_file }}"
+      delegate_to: localhost
+      no_log: true
+      changed_when: true
+      when:
+        - _need_new_token | bool
+        - semaphore_save_api_token | bool
 
-        - name: Parse vault content
-          ansible.builtin.set_fact:
-            _vault_data: "{{ _vault_content.content | b64decode | from_yaml }}"
-          no_log: true
+    - name: Read decrypted vault file for update
+      ansible.builtin.slurp:
+        src: "{{ semaphore_api_token_vault_file }}"
+      register: _vault_content
+      delegate_to: localhost
+      no_log: true
+      when:
+        - _need_new_token | bool
+        - semaphore_save_api_token | bool
 
-        - name: Update vault data with new token
-          ansible.builtin.set_fact:
-            _vault_data_updated: "{{ _vault_data | combine({'semaphore_api_token': _semaphore_api_token}) }}"
-          no_log: true
+    - name: Parse vault content for update
+      ansible.builtin.set_fact:
+        _vault_data: "{{ _vault_content.content | b64decode | from_yaml | default({}) }}"
+      no_log: true
+      when:
+        - _need_new_token | bool
+        - semaphore_save_api_token | bool
 
-        - name: Write updated vault file
-          ansible.builtin.copy:
-            content: "{{ _vault_data_updated | to_nice_yaml }}"
-            dest: "{{ semaphore_api_token_vault_file }}"
-            mode: '0600'
-          delegate_to: localhost
-          no_log: true
+    - name: Update vault data with new token
+      ansible.builtin.set_fact:
+        _vault_data_updated: "{{ _vault_data | combine({'semaphore_api_token': _semaphore_api_token}) }}"
+      no_log: true
+      when:
+        - _need_new_token | bool
+        - semaphore_save_api_token | bool
 
-        - name: Re-encrypt vault file
-          ansible.builtin.command:
-            cmd: "ansible-vault encrypt {{ _vault_pass_arg }} {{ semaphore_api_token_vault_file }}"
-          delegate_to: localhost
-          no_log: true
-          changed_when: true
+    - name: Write updated vault file
+      ansible.builtin.copy:
+        content: "{{ _vault_data_updated | to_nice_yaml }}"
+        dest: "{{ semaphore_api_token_vault_file }}"
+        mode: '0600'
+      delegate_to: localhost
+      no_log: true
+      when:
+        - _need_new_token | bool
+        - semaphore_save_api_token | bool
+
+    - name: Re-encrypt vault file after update
+      ansible.builtin.command:
+        cmd: "ansible-vault encrypt {{ _vault_pass_arg }} {{ semaphore_api_token_vault_file }}"
+      delegate_to: localhost
+      no_log: true
+      changed_when: true
+      when:
+        - _need_new_token | bool
+        - semaphore_save_api_token | bool
+
+    - name: Debug - token saved to vault
+      ansible.builtin.debug:
+        msg: "New API token saved to vault file: {{ semaphore_api_token_vault_file }}"
+      when:
+        - _need_new_token | bool
+        - semaphore_save_api_token | bool
+
   rescue:
     - name: Authentication failed
       ansible.builtin.fail:
         msg: |
-          ERROR: Failed to authenticate to Semaphore API.
+          ERROR: Failed to authenticate to Semaphore API or manage vault token.
 
           Possible causes:
             - Invalid admin credentials
             - API is not fully initialized
             - Network connectivity issues
+            - Vault file issues (missing, wrong password, etc.)
 
           Admin user: {{ semaphore_admin_user }}
           API URL: {{ semaphore_api_url }}
+          Vault file: {{ semaphore_api_token_vault_file if semaphore_save_api_token else 'N/A' }}
 
 # ==============================================
 # Project Setup (Optional)

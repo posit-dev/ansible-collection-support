@@ -11,3 +11,6 @@
 
   roles:
     - role: semaphore_ui
+      vars:
+        semaphore_api_token_vault_file: "{{ playbook_dir }}/../secrets/vault.yml"
+        semaphore_vault_password_file: "{{ playbook_dir }}/../secrets/.vault_pass"
