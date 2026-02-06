@@ -14,6 +14,7 @@
     api_endpoint_name: "{{ semaphore_api_endpoint }}"
     api_response_var: "{{ _endpoint_config.response_var }}"
     api_endpoint_description: "{{ _endpoint_config.description | default('') }}"
+    api_expects_json: "{{ _endpoint_config.json_response | default(true) }}"
 
 - name: Execute API call
   ansible.builtin.include_tasks: common_api_call.yml

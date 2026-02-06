@@ -12,6 +12,7 @@ semaphore_endpoint_config:
     path: "ping"
     response_var: "semaphore_ping_data"
     requires_project: false
+    json_response: false
     description: "Health check endpoint"
   info:
     path: "info"
@@ -78,6 +79,7 @@ semaphore_endpoint_config:
     response_var: "semaphore_task_raw_output_data"
     requires_project: true
     requires_resource: true
+    json_response: false
     description: "Task output (plain text)"
   variable_groups:
     path: "project/{{ semaphore_project_id }}/environment"

@@ -388,7 +388,7 @@
           ansible.builtin.assert:
             that:
               - semaphore_api_last_response is defined
-              - semaphore_api_last_response.status == 200
+              - semaphore_api_last_response.status | int == 200
               - semaphore_api_last_response.endpoint == "inventory"
             success_msg: "PASS: Response metadata test"
       rescue:
