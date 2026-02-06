@@ -71,19 +71,38 @@
   when: semaphore_api_token is not defined or semaphore_api_token == ""
   failed_when: false
 
+- name: Check if API response is valid
+  ansible.builtin.set_fact:
+    _api_response_valid: "{{ api_response is defined and api_response.status is defined }}"
+    _api_call_failed: "{{ api_response.failed | default(false) }}"
+    _api_call_msg: "{{ api_response.msg | default('No error message') }}"
+
 - name: Get human-readable error message for status code
   ansible.builtin.set_fact:
     _status_message: "{{ semaphore_http_status_messages[api_response.status] | default('Unknown error') }}"
-  when: api_response.status is defined and api_response.status != semaphore_api_status_code
+  when:
+    - _api_response_valid | bool
+    - api_response.status != semaphore_api_status_code
 
 - name: Check if API call was successful
   ansible.builtin.assert:
     that:
-      - api_response.status is defined
+      - _api_response_valid | bool
+      - not (_api_call_failed | bool)
       - api_response.status in (semaphore_api_expected_status_codes | default([semaphore_api_status_code]))
     fail_msg: |
       API call failed for {{ api_endpoint_name }} endpoint.
 
+      {% if not (_api_response_valid | bool) %}
+      Error: API call did not return a valid response
+      Message: {{ _api_call_msg }}
+      URL: {{ final_api_url }}
+
+      Troubleshooting:
+        - Check that the Semaphore server is running and reachable
+        - Verify the API URL is correct: {{ semaphore_api_base_url }}
+        - Check network connectivity and firewall rules
+      {% else %}
       Status Code: {{ api_response.status | default('N/A') }}
       Error: {{ _status_message | default('Unknown error') }}
       URL: {{ final_api_url }}
@@ -107,6 +126,7 @@
       {% endif %}
 
       Raw Response: {{ api_response.msg | default('No error message available') }}
+      {% endif %}
     success_msg: "Successfully retrieved data from {{ api_endpoint_name }} endpoint (HTTP {{ api_response.status }})"
 
 - name: Validate response is JSON

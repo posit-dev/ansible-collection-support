@@ -26,10 +26,16 @@
 # Load Token from Vault
 # ===========================================
 
+- name: Check if provided token is valid
+  ansible.builtin.set_fact:
+    _provided_token_valid: >-
+      {{ (semaphore_api_token | default('', true) | string | trim | length) > 0 and
+         (semaphore_api_token | default('', true) | string) != 'None' }}
+
 - name: Load token from vault
   when:
     - _semaphore_vault_exists | bool
-    - semaphore_api_token | default('') | length == 0
+    - not (_provided_token_valid | bool)
   block:
     - name: Build vault password file argument
       ansible.builtin.set_fact:
@@ -68,14 +74,20 @@
       changed_when: false
       when: _decrypt_result.rc == 0
 
+    - name: Check if vault token is valid
+      ansible.builtin.set_fact:
+        _vault_token_valid: >-
+          {{ _vault_data is defined and
+             _vault_data.semaphore_api_token is defined and
+             (_vault_data.semaphore_api_token | default('', true) | string | trim | length) > 0 and
+             (_vault_data.semaphore_api_token | default('', true) | string) != 'None' }}
+      no_log: true
+
     - name: Set API token from vault
       ansible.builtin.set_fact:
         semaphore_api_token: "{{ _vault_data.semaphore_api_token }}"
       no_log: true
-      when:
-        - _vault_data is defined
-        - _vault_data.semaphore_api_token is defined
-        - _vault_data.semaphore_api_token | length > 0
+      when: _vault_token_valid | bool
 
     - name: Report vault token status
       ansible.builtin.debug:
@@ -90,7 +102,9 @@
 
 - name: Check if token creation is needed
   ansible.builtin.set_fact:
-    _semaphore_need_new_token: "{{ semaphore_api_token | default('') | length == 0 }}"
+    _semaphore_need_new_token: >-
+      {{ (semaphore_api_token | default('', true) | string | trim | length) == 0 or
+         (semaphore_api_token | default('', true) | string) == 'None' }}
 
 - name: Create new API token
   when:
@@ -210,6 +224,12 @@
 # Final Validation
 # ===========================================
 
+- name: Check if final token is valid
+  ansible.builtin.set_fact:
+    _final_token_valid: >-
+      {{ (semaphore_api_token | default('', true) | string | trim | length) > 0 and
+         (semaphore_api_token | default('', true) | string) != 'None' }}
+
 - name: Fatal error - no API token available
   ansible.builtin.fail:
     msg: |
@@ -232,5 +252,5 @@
            -e semaphore_api_user="admin"
            -e semaphore_api_password="your_password"
   when:
-    - semaphore_api_token | default('') | length == 0
+    - not (_final_token_valid | bool)
     - not (_semaphore_vault_exists | bool)
